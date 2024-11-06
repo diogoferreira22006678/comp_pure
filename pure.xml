@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="component" version="3.0" method="upgrade">
+    <name>com_pure</name>
+    <creationDate>2024-01-22</creationDate>
+    <copyright>2024 Diogo</copyright>
+    <license>GNU General Public License version 2 or later; see LICENSE.txt</license>
+    <author>Diogo</author>
+    <authorEmail>diogo.ferreira@ulusofona.pt</authorEmail>
+    <authorUrl>http://</authorUrl>
+    <version>CVS: 1.0.0</version>
+    <description>COM_PURE_XML_DESCRIPTION</description>
+    
+    
+    
+    <install> <!-- Runs on install -->
+        <sql>
+            <file driver="mysql" charset="utf8">sql/install.mysql.utf8.sql</file>
+        </sql>
+    </install>
+    <update> <!-- Runs on update -->
+        <schemas>
+            <schemapath type="mysql">sql/updates</schemapath>
+        </schemas>
+    </update>
+    <uninstall> <!-- Runs on uninstall -->
+        <sql>
+            <file driver="mysql" charset="utf8">sql/uninstall.mysql.utf8.sql</file>
+        </sql>
+    </uninstall>
+
+    <files folder="site">
+        <filename>config.php</filename>
+        <filename>index.html</filename>
+        <filename>pure.php</filename>
+        <filename>controller.php</filename>
+        <filename>router.php</filename>
+        <folder>views</folder>
+        <folder>models</folder>
+        <folder>controllers</folder>
+        <folder>helpers</folder>
+    </files>
+    <media destination="com_pure" folder="media">
+        <folder>js</folder>
+        <folder>css</folder>
+    </media>
+    <languages folder="site/languages">
+        
+			<language tag="en-GB">en-GB/en-GB.com_pure.ini</language>
+			<language tag="pt-PT">pt-PT/pt-PT.com_pure.ini</language>
+    </languages>
+    <administration>
+        <menu>COM_PURE</menu>
+        <submenu>
+        
+			<menu link="option=com_pure&amp;view=pure" view="pure" alt="Pure/Pure">COM_PURE_TITLE_PURE</menu>
+
+        </submenu>
+        <files folder="administrator">
+            <filename>access.xml</filename>
+            <filename>config.xml</filename>
+            <filename>controller.php</filename>
+            <filename>index.html</filename>
+            <filename>pure.php</filename>
+            <folder>controllers</folder>
+            <folder>assets</folder>
+            <folder>helpers</folder>
+            <folder>models</folder>
+            <folder>sql</folder>
+            <folder>tables</folder>
+            <folder>views</folder>
+        </files>
+        <languages folder="administrator/languages">
+            
+			<language tag="en-GB">en-GB/en-GB.com_pure.ini</language>
+			<language tag="en-GB">en-GB/en-GB.com_pure.sys.ini</language>
+			<language tag="pt-PT">pt-PT/pt-PT.com_pure.ini</language>
+			<language tag="pt-PT">pt-PT/pt-PT.com_pure.sys.ini</language>
+        </languages>
+    </administration>
+    <config>
+        <fields name="params">
+            <fieldset name="component">
+                <field name="save_history" default="0" />
+            </fieldset>
+        </fields>
+    </config>
+    <plugins>
+        <plugin group="search" plugin="pure"/>
+    </plugins>
+    
+</extension>
+<!-- Component built by the Joomla Component Creator -->
+<!-- http://www.component-creator.com/ -->
