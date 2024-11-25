@@ -102,44 +102,10 @@ $institutions = $response['items'];
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="alert alert-info" role="alert">
-        <strong>Heads up!</strong> You can select multiple types by holding down the Ctrl (windows) or Command (Mac) button while selecting.
-    </div>
-    <div class="form-group">
-        <label for="type">Type</label>
-        <select class="form-control" id="type" name="type[]" multiple>
-            <option value="Academic">Academic</option>
-            <option value="Non-academic">Non-academic</option>
-            <option value="PhD">PhD</option>
-            <option value="Other">Other</option>
-            <option value="Visiting Scholar">Visiting Scholar</option>
-            <option value="Honorary staff">Honorary staff</option>
-        </select>
-    </div>
 <hr>
-<!-- subtitle -->
-<h2 class="h4">Publications Filtered By Date</h2>
-    <div class="form-group">
-        <label for="start_date">Start Date</label>
-        <input type="date" class="form-control" id="start_date" name="start_date">
-    </div>
-    <div class="form-group">
-        <label for="end_date">End Date</label>
-        <input type="date" class="form-control" id="end_date" name="end_date">
-    </div>
     <button type="submit" class="btn btn-primary">Execute API Call</button>
     <?php echo JHtml::_('form.token'); ?>
 </form>
-
-<script>
-    document.getElementById('adminForm').addEventListener('submit', function(event) {
-        const types = document.getElementById('type').selectedOptions;
-        if (types.length === 0) {
-            alert('You must choose at least one type');
-            event.preventDefault();
-        }
-    });
-</script>
 
 
 
