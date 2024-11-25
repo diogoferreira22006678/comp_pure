@@ -824,7 +824,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             $info = $this->generateTitle($institutionDetails['name']['pt_PT'], $institutionDetails['uuid']);
             $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+            $introtext = $assetId ? $this->deleteArticleById($assetId) : $academics . '<br><br>' . $research_outputs;
 
             $data = [
                 'title' => $info['title'],
@@ -906,7 +906,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     {
         $html = '<ul>';
         foreach ($dataArray as $data) {
-            $li   nk = $data['pure-link'];
+            $link = $data['pure-link'];
             $html .= '<li><a href="' . $link . '">' . htmlspecialchars($data[$displayKey]) . '</a></li>';
         }
         $html .= '</ul>';
