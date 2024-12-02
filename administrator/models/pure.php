@@ -126,9 +126,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     public function callApiPure($params)
     {
         try {
-            $this->institutionFilteredTypePersonRoute($params['institution'], $params['type']);
+            $this->institutionFilteredTypePersonRoute($params['institution']);
             $this->researchOutputsFilteredTypeRoute($params['institution']);
-            $this->createIndexPage($params);
+            // $this->createIndexPage($params);
         } catch (Exception $e) {
             print_r('Error in callApiPure: ' . $e->getMessage());
             return false;
@@ -136,16 +136,16 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         return true;
     }
 
-    /**
-     * Creates index page for the institution.
-     *
-     * @param array $params
-     */
-    public function createIndexPage($params)
-    {
-        $institutionDetails = $this->getInstitutionDetails($params['institution']);
-        $this->createArticleIndex($institutionDetails, $this->ensureCategoryExists($this->institutionArray['institution']));
-    }
+    // /**
+    //  * Creates index page for the institution.
+    //  *
+    //  * @param array $params
+    //  */
+    // public function createIndexPage($params)
+    // {
+    //     $institutionDetails = $this->getInstitutionDetails($params['institution']);
+    //     $this->createArticleIndex($institutionDetails, $this->ensureCategoryExists($this->institutionArray['institution']));
+    // }
 
     /**
      * Fetches persons of specified types from an institution.
@@ -153,7 +153,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      * @param string $institution
      * @param array $types
      */
-    public function institutionFilteredTypePersonRoute($institution, $types)
+    public function institutionFilteredTypePersonRoute($institution)
     {
         $response = $this->institutionDependentsFilteredByPerson($institution);
         $persons = $response['items'];
@@ -164,10 +164,14 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             $person_uuid = $person['uuid'];
             $person_response = $this->person($person_uuid);
-            $person_type = $person_response['staffOrganizationAssociations'][0]['staffType']['term']['en_GB'] ?? '';
-
-            if ($types && !in_array($person_type, $types)) continue;
-
+            // Find the correct association for the given institution
+            $person_type = '';
+            foreach ($person_response['staffOrganizationAssociations'] as $association) {
+                if ($association['organization']['uuid'] === $institution) {
+                    $person_type = $association['staffType']['term']['en_GB'] ?? 'Other';
+                    break;
+                }
+            }
             $profile_photo = $this->getProfilePhoto($person_response['profilePhotos']);
             $name_variant = $this->getNameVariant($person_response['name']);
             $email = $this->getUserEmail($person_uuid);
@@ -178,15 +182,17 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             $data[] = [
                 'uuid' => $person_uuid,
-                'profile_photo' => $profile_photo,
-                'name_variant' => $name_variant,
+                'profile-photo' => $profile_photo,
+                'name-variant' => $name_variant,
                 'email' => $email,
-                'orcid_id' => $orcid_id,
-                'ciencia_vitae_id' => $ciencia_vitae_id,
-                'scopus_author_id' => $scopus_author_id,
+                'orcid-id' => $orcid_id,
+                'ciencia-vitae-id' => $ciencia_vitae_id,
+                'scopus-author-id' => $scopus_author_id,
                 'biography' => $biography,
-                'pure_link' => $pure_link
+                'pure-link' => $pure_link,
+                'type' => $person_type
             ];
+
         }
 
         $this->processPersonsData($data);
@@ -250,12 +256,15 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     {
         $categoriesIds = $this->getCategoriesIds();
         $this->ensureGroupFields();
-
         foreach ($data as $person) {
-            $categoryId = $this->getPersonCategoryId($person['name_variant'], $categoriesIds);
+            $personType = $person['type'];
+    
+            $categoryId = $this->getPersonCategoryId($personType, $categoriesIds);
+    
             $this->createArticlePerson($person, $categoryId);
         }
     }
+    
 
     /**
      * Ensures all required group fields exist.
@@ -288,8 +297,11 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             'Visiting Scholar' => 'visitingScholar',
             'Honorary staff' => 'honoraryStaff'
         ];
-
-        return $categoriesIds[$mapping[$person_type] ?? 'other'];
+    
+        $categoryKey = $mapping[$person_type] ?? 'other';
+        $categoryId = $categoriesIds[$categoryKey] ?? null;
+    
+        return $categoryId;
     }
 
     /**
@@ -317,7 +329,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     private function getProfilePhoto($profilePhotos)
     {
         foreach ($profilePhotos as $profilePhoto) {
-            if ($profilePhoto['type'] === 'portrait') {
+            if ($profilePhoto['type']['uri'] === '/dk/atira/pure/person/personfiles/portrait') {
                 return $profilePhoto['url'];
             }
         }
@@ -611,68 +623,113 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     private function createOrUpdateField($groupId, $fieldInfo, $categories)
     {
-		$db = Factory::getDbo();
-		$query = $db->getQuery(true);
-		$query->select('id')
-			->from($db->quoteName('#__fields'))
-			->where($db->quoteName('name') . ' = ' . $db->quote($fieldInfo['name']))
-			->where($db->quoteName('context') . ' = ' . $db->quote('com_content.article'))
-			->where($db->quoteName('group_id') . ' = ' . $db->quote($groupId));
-		$db->setQuery($query);
-		$existingFieldId = $db->loadResult();
-	
-		if ($existingFieldId) {
-			print_r('Field already exists: ' . $fieldInfo['name']);
-			$this->associateFieldWithCategories($existingFieldId, $categories);
-			return;
-		}
-
-        $this->createField($groupId, $fieldInfo, $categories);
-       
+        try {
+            // Determine field type
+            $fieldInfo['type'] = ($fieldInfo['name'] === 'profile-photo') ? 'media' : 'textarea';
+    
+            // Validate field information
+            if (empty($fieldInfo['name']) || empty($fieldInfo['title'])) {
+                throw new Exception('Invalid field info: Name and Title are required.');
+            }
+    
+            // Check if the field already exists
+            $db = Factory::getDbo();
+            $query = $db->getQuery(true)
+                ->select('id')
+                ->from($db->quoteName('#__fields'))
+                ->where($db->quoteName('name') . ' = ' . $db->quote($fieldInfo['name']))
+                ->where($db->quoteName('context') . ' = ' . $db->quote('com_content.article'))
+                ->where($db->quoteName('group_id') . ' = ' . $db->quote($groupId));
+            $db->setQuery($query);
+            $existingFieldId = $db->loadResult();
+    
+            if ($existingFieldId) {
+                print_r('Field already exists: ' . $fieldInfo['name']);
+                return $existingFieldId;
+            }
+    
+            // Create the field if it does not exist
+            return $this->createField($groupId, $fieldInfo, $categories);
+    
+        } catch (Exception $e) {
+            print_r('Error in createOrUpdateField: ' . $e->getMessage());
+            return null;
+        }
     }
-
+    
     /**
      * Creates a field and associates it with categories.
      *
      * @param int $groupId
      * @param array $fieldInfo
      * @param array $categories
+     * @return int|null The ID of the created field, or null on failure.
      */
     private function createField($groupId, $fieldInfo, $categories)
     {
         \JLoader::register('FieldsModelField', JPATH_ADMINISTRATOR . '/components/com_fields/models/field.php');
         $app = Factory::getApplication();
 
-        $params = ['show_label' => '1', 'required' => '0', 'language' => ''];
-        if (isset($fieldInfo['filter']) && $fieldInfo['filter'] === 'html') {
-            $fieldparams = ['filter' => 'safehtml', 'maxlength' => ''];
+        try {
+            // Default parameters
+            $params = [
+                'show_label' => '1',
+                'required' => '0',
+                'language' => '*'
+            ];
+
+            // Additional parameters for specific field types
+            $fieldparams = [];
+            if ($fieldInfo['type'] === 'media') {
+                $fieldparams = [
+                    'image_directory' => 'images', // Restrict uploads to the images directory
+                    'allowed_extensions' => 'jpg,jpeg,png,gif', // Allowed image types
+                    'media_type' => 'image' // Restrict media type to images
+                ];
+            } elseif (isset($fieldInfo['filter']) && $fieldInfo['filter'] === 'html') {
+                $fieldparams = [
+                    'filter' => 'safehtml',
+                    'maxlength' => ''
+                ];
+            }
+
+            // Prepare field data
+            $data = [
+                'title' => $fieldInfo['title'],
+                'name' => $fieldInfo['name'],
+                'label' => $fieldInfo['title'],
+                'type' => $fieldInfo['type'] ?? 'textarea', // Default to textarea if type not provided
+                'context' => 'com_content.article',
+                'group_id' => $groupId,
+                'state' => 1,
+                'access' => 1,
+                'language' => '*',
+                'created_by' => Factory::getUser()->id,
+                'params' => json_encode($params),
+                'fieldparams' => json_encode($fieldparams),
+                'description' => $fieldInfo['title'] . ' field',
+            ];
+
+            // Create the field
+            $fieldModel = $app->bootComponent('com_fields')->getMVCFactory()->createModel('Field', 'Administrator', ['ignore_request' => true]);
+            if (!$fieldModel->save($data)) {
+                throw new Exception('Error creating field: ' . $fieldModel->getError());
+            }
+
+            // Get the created field ID
+            $fieldId = $fieldModel->getState('field.id');
+
+            // Associate the field with categories
+            $this->associateFieldWithCategories($fieldId, $categories);
+
+            return $fieldId;
+
+        } catch (Exception $e) {
+            print_r('Error in createField: ' . $e->getMessage());
+            return null;
         }
-
-        $data = [
-            'title' => $fieldInfo['title'],
-            'name' => $fieldInfo['name'],
-            'label' => $fieldInfo['title'],
-            'type' => 'textarea',
-            'context' => 'com_content.article',
-            'group_id' => $groupId,
-            'state' => 1,
-            'access' => 1,
-            'language' => '*',
-            'created_by' => Factory::getUser()->id,
-            'params' => json_encode($params),
-            'fieldparams' => json_encode($fieldparams ?? []),
-            'description' => $fieldInfo['title'] . ' field',
-        ];
-
-        $fieldModel = $app->bootComponent('com_fields')->getMVCFactory()->createModel('Field', 'Administrator', ['ignore_request' => true]);
-        if (!$fieldModel->save($data)) {
-            print_r('Error creating field: ' . $fieldModel->getError());
-            return;
-        }
-
-        $fieldId = $fieldModel->getState('field.id');
-        $this->associateFieldWithCategories($fieldId, $categories);
     }
+
 
     /**
      * Associates a field with multiple categories.
@@ -728,9 +785,15 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $app = Factory::getApplication();
 
         try {
-            $info = $this->generateTitle($person['name_variant'], $person['uuid']);
+            $info = $this->generateTitle($person['name-variant'], $person['uuid']);
             $assetId = $this->getArticleViaAlias($info['alias']);
             $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+
+            // check if title and alias are valid, if not put a default value with a random number
+            if (empty($info['title']) || empty($info['alias'])) {
+                $info['title'] = 'Person' . rand(1, 1000);
+                $info['alias'] = 'person-' . rand(1, 1000);
+            }
 
             $data = [
                 'title' => $info['title'],
@@ -840,6 +903,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             $groupFieldId = $this->ensureGroupFieldForInstitution('Institution', true);
             $fields = $this->getFieldsByGroup($groupFieldId);
+            
 
             $model = $app->bootComponent('com_content')->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true]);
             if (!$model->save($data)) {
@@ -871,10 +935,82 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         foreach ($fields as $field) {
             $fieldValue = $data[$field['name']] ?? '';
             if ($fieldValue) {
+                // if its profile photo, we need to download the image and save it to the server
+                if ($field['name'] === 'profile-photo') {
+                    $info = $this->generateTitle($data['name-variant'], $data['uuid']);
+                    $fieldValue = $this->downloadImage($fieldValue, $articleId, $info);
+                }
                 $this->updateArticleWithCustomField($field['id'], $articleId, $fieldValue);
             }
         }
     }
+
+    /**
+     * Downloads an image from a URL requiring an API key and saves it to the server.
+     *
+     * @param string $url The image URL.
+     * @param int $articleId The article ID for naming the saved image.
+     * @param array $info Additional info for file naming.
+     * @return string The local path to the saved image.
+     */
+    private function downloadImage($url, $articleId, $info)
+    {
+        // Define the API key
+        $apiKey = '47e5bd25-8649-4b60-b8b7-ac0e1381b300'; // Replace with your actual API key
+
+        // Set up the HTTP context with the API key
+        $context = stream_context_create([
+            'http' => [
+                'header' => "Api-Key: $apiKey\r\n",
+                'ignore_errors' => true, // To capture errors in response
+            ]
+        ]);
+
+        // Fetch the image data
+        $imageData = file_get_contents($url, false, $context);
+
+        // Check for errors during the fetch
+        if ($imageData === false) {
+            print_r("Failed to download image from URL: $url");
+            return '';
+        }
+
+        // Validate the response headers for HTTP errors
+        $headers = $http_response_header ?? [];
+        foreach ($headers as $header) {
+            if (strpos($header, 'HTTP/') === 0) {
+                $statusCode = (int)explode(' ', $header)[1];
+                if ($statusCode !== 200) {
+                    print_r("HTTP error while fetching image: $statusCode for URL: $url");
+                    return '';
+                }
+            }
+        }
+
+        // Validate that the data is an image
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->buffer($imageData);
+        if (strpos($mimeType, 'image/') !== 0) {
+            print_r("Invalid image data fetched from URL: $url");
+            return '';
+        }
+
+        // Save the image locally
+        $path = JPATH_SITE . '/images/' . $info['alias'] . '.jpg';
+
+        // if the file already exists, delete it
+        if (file_exists($path)) {
+            unlink($path);
+        }
+
+        if (!file_put_contents($path, $imageData)) {
+            print_r("Failed to save image to path: $path");
+            return '';
+        }
+
+        return $path;
+    }
+
 
     /**
      * Generates HTML list of links from data array.
