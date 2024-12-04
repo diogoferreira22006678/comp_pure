@@ -306,10 +306,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $research_output_uuid = $research_output['uuid'];
             $research_output_response = $this->researchOutput($research_output_uuid);
             $formattedData = $this->formatResearchOutputData($research_output_response);
-            print_r($formattedData);
             // Extract year and type
             $year = $formattedData['publication-date'] ?? $trans['no_year'];
-            $type = $formattedData['type']['term']['en_GB'] ?? $trans['no_type']; // Default to 'no type' if not found
+            $type = $formattedData['type'] ?? $trans['no_type'];
     
             // Initialize the structure if not set
             if (!isset($groupedData[$year])) {
@@ -321,9 +320,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     
             // Add the formatted data to the appropriate year and type
             $groupedData[$year][$type][] = $formattedData;
-            print_r($groupedData);
         }
-        return;
     
         // Initialize variable for grouped tables
         $groupedTables = '';
@@ -343,25 +340,27 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
     
                 // Render the outer content (individual items)
-                $outerContent = '';
+                $tableRows = '';
                 foreach ($outputs as $output) {
                     // Replace placeholders in outer HTML model
-                    $outerContent .= str_replace(
-                        ['[[title]]', '[[publication-date]]', '[[abstract]]', '[[pure-link]]', '[[contributors]]', '[[keywords]]'],
-                        [
-                            htmlspecialchars($output['title']),
-                            htmlspecialchars($output['publication-date']),
-                            htmlspecialchars($output['abstract']),
-                            htmlspecialchars($output['pure-link']),
-                            htmlspecialchars(implode(', ', $output['contributors'])),
-                            htmlspecialchars(implode(', ', $output['keywords']))
-                        ],
-                        $outerTemplate
-                    );
+                    $tableRow = preg_replace_callback("/\[\[([\w]+)\]\]/", function ($matches) use ($output, $trans) {
+                        $placeholders= [
+                            'title' => $output['title'],
+                            'publication-date' => $output['publication_date'],
+                            'abstract' => $output['abstract'],
+                            'pure-link' => $output['pure_link'],
+                            'contributors' => $output['contributors'],
+                            'keywords' => $output['keywords']
+                        ];
+                        $placeholder = $placeholders[$matches[1]];
+						return isset($placeholders[$placeholder]) ? $placeholders[$placeholder] : $matches[0];
+                    }, $outerTemplate);
+
+                    $tableRows .= "<tr>$tableRow</tr>";
                 }
     
                 // Wrap the outer content using the inner template (list)
-                $renderedInnerContent = str_replace('[[inner]]', $outerContent, $innerTemplate);
+                $renderedInnerContent = str_replace('[[inner]]', $tableRows, $innerTemplate);
     
                 // Wrap the rendered inner content using the table template (table)
                 $finalOutput = str_replace('[[table]]', $renderedInnerContent, $tableTemplate);
@@ -397,6 +396,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $pure_link = $research_output_response['portalUrl'] ?? '';
         $contributors = $this->getContributors($research_output_response['contributors']);
         $keywords = $this->getKeywords($research_output_response['keywordGroups']);
+        $type = $research_output_response['type']['term']['en_GB'] ?? 'No Type';
 
         return [
             'uuid' => $research_output_response['uuid'],
@@ -405,7 +405,8 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             'abstract' => $abstract,
             'pure-link' => $pure_link,
             'contributors' => $contributors,
-            'keywords' => $keywords
+            'keywords' => $keywords,
+            'type' => $type
         ];
     }
 
