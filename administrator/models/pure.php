@@ -47,6 +47,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     ];
     protected $personArray = [];
     protected $researchOutputArray = [];
+    protected $modelOutputs = [];
 
     /**
      * Method to auto-populate the model state.
@@ -115,6 +116,50 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         return $items;
     }
 
+    // function to save output models
+    public function updateHtmlModelsOutputs($html_model_outers, $html_model_inners, $id, $html_model_table = '')
+	{
+		$this->saveHtmlModel($html_model_outers, $html_model_inners, $id, $html_model_table);
+	}
+
+    protected function saveHtmlModel($html_model_outers, $html_model_inners, $id, $html_model_table = '')
+	{
+		// check if id exists in #__html_model table and update it, if not insert it
+		$db = Factory::getDbo();
+		$query = $db->getQuery(true);
+		$query->select($db->quoteName('id'))
+			->from($db->quoteName('#__html_model'))
+			->where($db->quoteName('id') . ' = ' . $db->quote($id));
+		$db->setQuery($query);
+		$result = $db->loadResult();
+
+		if ($result) {
+			$query = $db->getQuery(true);
+			$fields = array(
+				$db->quoteName('html_model_outers') . ' = ' . $db->quote($html_model_outers),
+				$db->quoteName('html_model_inners') . ' = ' . $db->quote($html_model_inners),
+				$db->quoteName('html_model_table') . ' = ' . $db->quote($html_model_table)
+			);
+			$conditions = array(
+				$db->quoteName('id') . ' = ' . $db->quote($id)
+			);
+			$query->update($db->quoteName('#__html_model'))->set($fields)->where($conditions);
+			$db->setQuery($query);
+			$db->execute();
+		} else {
+			$query = $db->getQuery(true);
+			$fields = array(
+				$db->quoteName('id') . ' = ' . $db->quote($id),
+				$db->quoteName('html_model_outers') . ' = ' . $db->quote($html_model_outers),
+				$db->quoteName('html_model_inners') . ' = ' . $db->quote($html_model_inners),
+				$db->quoteName('html_model_table') . ' = ' . $db->quote($html_model_table)
+			);
+			$query->insert($db->quoteName('#__html_model'))->set($fields);
+			$db->setQuery($query);
+			$db->execute();
+		}
+	}
+
     /*-------------------------------------------API INTEGRATION----------------------------------------------------------------*/
 
     /**
@@ -126,7 +171,19 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     public function callApiPure($params)
     {
         try {
-            $this->institutionFilteredTypePersonRoute($params['institution']);
+
+            $outputInners = $params['html_model_inners_outputs'];
+            $outputOuters = $params['html_model_outers_outputs'];
+            $outputTable = $params['html_model_table_outputs'];
+            $this->updateHtmlModelsOutputs($outputOuters, $outputInners, 1, $outputTable);
+
+            $this->modelOutputs = [
+                'html_model_inners_outputs' => $outputInners,
+                'html_model_outers_outputs' => $outputOuters,
+                'html_model_table_outputs' => $outputTable
+            ];
+
+            //$this->institutionFilteredTypePersonRoute($params['institution']);
             $this->researchOutputsFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
         } catch (Exception $e) {
@@ -205,21 +262,126 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     public function researchOutputsFilteredTypeRoute($institution)
     {
+        // Fetch dependents by institution
         $response = $this->institutionDependentsFilteredByPerson($institution);
         $research_outputs = $response['items'];
-
+    
+        // Translation dictionary
+        $translations = [
+            'pt-PT' => [
+                'no_year' => 'Sem Ano',
+                'no_type' => 'Sem Tipo',
+                'no_name' => 'Sem Nome',
+                'title' => 'Título',
+                'publication_date' => 'Data de Publicação',
+                'contributors' => 'Contribuidores',
+                'keywords' => 'Palavras-chave',
+                'abstract' => 'Resumo',
+                'research_outputs' => 'Resultados de Pesquisa'
+            ],
+            'en-GB' => [
+                'no_year' => 'No Year',
+                'no_type' => 'No Type',
+                'no_name' => 'No Name',
+                'title' => 'Title',
+                'publication_date' => 'Publication Date',
+                'contributors' => 'Contributors',
+                'keywords' => 'Keywords',
+                'abstract' => 'Abstract',
+                'research_outputs' => 'Research Outputs'
+            ]
+        ];
+    
+        // Retrieve translations based on the selected language
+        $lang = 'en-GB'; // Set default language, can be dynamic
+        $trans = $translations[$lang] ?? $translations['en-GB']; // Default to English if language not found
+    
+        // Group research outputs by year and type
+        $groupedData = [];
         foreach ($research_outputs as $research_output) {
-            if ($research_output['systemName'] !== 'ResearchOutput') continue;
-
+            if ($research_output['systemName'] !== 'ResearchOutput') {
+                continue;
+            }
+    
             $research_output_uuid = $research_output['uuid'];
             $research_output_response = $this->researchOutput($research_output_uuid);
-
             $formattedData = $this->formatResearchOutputData($research_output_response);
-        
-            $this->researchOutputArray[] = $formattedData;
-            //$this->createArticleResearchOutput($formattedData, $this->ensureCategoryExists($this->categoryResearchOutput['researchOutput']));
+            print_r($formattedData);
+            // Extract year and type
+            $year = $formattedData['publication-date'] ?? $trans['no_year'];
+            $type = $formattedData['type']['term']['en_GB'] ?? $trans['no_type']; // Default to 'no type' if not found
+    
+            // Initialize the structure if not set
+            if (!isset($groupedData[$year])) {
+                $groupedData[$year] = [];
+            }
+            if (!isset($groupedData[$year][$type])) {
+                $groupedData[$year][$type] = [];
+            }
+    
+            // Add the formatted data to the appropriate year and type
+            $groupedData[$year][$type][] = $formattedData;
+            print_r($groupedData);
         }
+        return;
+    
+        // Initialize variable for grouped tables
+        $groupedTables = '';
+    
+        // Process each year/type group into a separate table
+        foreach ($groupedData as $year => $types) {
+            // Create the year heading
+            $groupedTables .= "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
+    
+            foreach ($types as $type => $outputs) {
+                // Create the type heading
+                $groupedTables .= "<h3>" . htmlspecialchars($type) . "</h3>";
+    
+                // Get the user's HTML models
+                $innerTemplate = $this->modelOutputs['html_model_inners_outputs']; // Inner template wraps the list
+                $outerTemplate = $this->modelOutputs['html_model_outers_outputs']; // Outer template formats individual items
+                $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
+    
+                // Render the outer content (individual items)
+                $outerContent = '';
+                foreach ($outputs as $output) {
+                    // Replace placeholders in outer HTML model
+                    $outerContent .= str_replace(
+                        ['[[title]]', '[[publication-date]]', '[[abstract]]', '[[pure-link]]', '[[contributors]]', '[[keywords]]'],
+                        [
+                            htmlspecialchars($output['title']),
+                            htmlspecialchars($output['publication-date']),
+                            htmlspecialchars($output['abstract']),
+                            htmlspecialchars($output['pure-link']),
+                            htmlspecialchars(implode(', ', $output['contributors'])),
+                            htmlspecialchars(implode(', ', $output['keywords']))
+                        ],
+                        $outerTemplate
+                    );
+                }
+    
+                // Wrap the outer content using the inner template (list)
+                $renderedInnerContent = str_replace('[[inner]]', $outerContent, $innerTemplate);
+    
+                // Wrap the rendered inner content using the table template (table)
+                $finalOutput = str_replace('[[table]]', $renderedInnerContent, $tableTemplate);
+    
+                // Append the final table content to grouped tables
+                $groupedTables .= $finalOutput;
+            }
+        }
+
+        echo "<pre>";
+        print_r($groupedTables);
+        echo "</pre>";
+    
+        // Return the final grouped tables HTML
+        return $groupedTables;
     }
+    
+    
+    
+    
 
     /**
      * Formats research output data for article creation.
@@ -957,7 +1119,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     {
         // Define the API key
         $apiKey = '47e5bd25-8649-4b60-b8b7-ac0e1381b300'; // Replace with your actual API key
-
+    
         // Set up the HTTP context with the API key
         $context = stream_context_create([
             'http' => [
@@ -965,16 +1127,16 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'ignore_errors' => true, // To capture errors in response
             ]
         ]);
-
+    
         // Fetch the image data
         $imageData = file_get_contents($url, false, $context);
-
+    
         // Check for errors during the fetch
         if ($imageData === false) {
             print_r("Failed to download image from URL: $url");
             return '';
         }
-
+    
         // Validate the response headers for HTTP errors
         $headers = $http_response_header ?? [];
         foreach ($headers as $header) {
@@ -986,7 +1148,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 }
             }
         }
-
+    
         // Validate that the data is an image
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->buffer($imageData);
@@ -994,22 +1156,35 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             print_r("Invalid image data fetched from URL: $url");
             return '';
         }
-
+    
         // Save the image locally
-        $path = JPATH_SITE . '/images/' . $info['alias'] . '.jpg';
-
-        // if the file already exists, delete it
+        $filename = $info['alias'] . '.jpg';
+        $path = JPATH_SITE . '/images/' . $filename;
+    
+        // If the file already exists, delete it
         if (file_exists($path)) {
             unlink($path);
         }
-
+    
         if (!file_put_contents($path, $imageData)) {
             print_r("Failed to save image to path: $path");
             return '';
         }
-
-        return $path;
+    
+        // Get image dimensions
+        list($width, $height) = getimagesize($path);
+    
+        // Create the JSON structure
+        $relativePath = 'images/' . $filename;
+        $joomlaImage = $relativePath . '#joomlaImage://local-' . $relativePath . "?width={$width}&height={$height}";
+        $result = [
+            'imagefile' => $joomlaImage,
+            'alt_text' => '' // Adjust or set dynamically if needed
+        ];
+    
+        return json_encode($result);
     }
+    
 
 
     /**
