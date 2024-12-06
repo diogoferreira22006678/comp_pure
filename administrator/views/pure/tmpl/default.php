@@ -86,6 +86,67 @@ function institutuions($base_url) {
 $response = institutuions($base_api);
 $institutions = $response['items'];
 
+// Get a database connection
+$db = Factory::getDbo();
+
+// Table name
+$prefix = $db->getPrefix();
+$tableName = $prefix . 'html_model';
+$tableUpdateName = $prefix . 'update_history';
+
+// Check if the table exists
+$query = "SHOW TABLES LIKE " . $db->quote($tableName); // Use quote function to properly quote the table name
+$db->setQuery($query);
+$tableExists = (bool) $db->loadResult();
+
+// Create table if it doesn't exist
+if (!$tableExists) {
+    // Construct SQL query to create table
+    $query = "
+            CREATE TABLE $tableName (
+                id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                html_model_inners TEXT NOT NULL,
+                html_model_outers TEXT NOT NULL,
+                html_model_table TEXT NULL
+            )
+        ";
+
+    $db->setQuery($query);
+    $db->execute();
+} else {
+
+    $query = "SHOW COLUMNS FROM $tableName LIKE 'html_model_table'";
+    $db->setQuery($query);
+    $columnExists = (bool) $db->loadResult();
+
+    if (!$columnExists) {
+        $query = "ALTER TABLE $tableName ADD COLUMN html_model_table TEXT NULL";
+        $db->setQuery($query);
+        $db->execute();
+    }
+
+    $innerOutputs = "SELECT html_model_inners FROM $tableName WHERE id = 1";
+    $db->setQuery($innerOutputs);
+    $currentHtmlModelInnersOutputs = $db->loadResult();
+    if (empty($currentHtmlModelInnersOutputs)) {
+        $currentHtmlModelInnersOutputs = '<li><a href="[[pure-link]]">[[title]]</a></li>';
+    }
+
+    $OuterOutputs = "SELECT html_model_outers FROM $tableName WHERE id = 1";
+    $db->setQuery($OuterOutputs);
+    $currentHtmlModelOutersOutputs = $db->loadResult();
+    if (empty($currentHtmlModelOutersOutputs)) {
+        $currentHtmlModelOutersOutputs = '<ul>[[inner]]</ul>';
+    }
+
+    $tableOutputs = "SELECT html_model_table FROM $tableName WHERE id = 1";
+    $db->setQuery($tableOutputs);
+    $currentHtmlModelTableOutputs = $db->loadResult();
+    if (empty($currentHtmlModelTableOutputs)) {
+        $currentHtmlModelTableOutputs = '<tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>';
+    }
+}
+
 ?>
 
 <h1 class="h3">PRL (Pure Research Lusófona) </h1>
@@ -103,6 +164,54 @@ $institutions = $response['items'];
         </select>
     </div>
 <hr>
+
+<h1 class="h3">Modelo HTML</h1>
+
+<ul>
+    <li>Para o modelo HTML, use <code>[[inner]]</code> para indicar onde o conteúdo interno deve ser inserido.</li>
+    <li>Exemplo: <code>&lt;ul&gt;[[inner]]&lt;/ul&gt;</code></li>
+    <li>Para os modelos de outputs e cursos, use variáveis como <code>[[nome]]</code>, <code>[[email]]</code>, <code>[[telefone]]</code>, etc.</li>
+    <li>Exemplo:
+        <code>
+            &lt;a href="[[link]]" class="docente"&gt;[[nome]]&lt;/a&gt;
+        </code>
+</ul>
+
+<hr>
+
+<h2 class="h4">Outputs</h2>
+
+<ul>
+    <h3 class="h5">Variáveis disponíveis para os outputs:</h3>
+    <li><code>[[title]]</code> - Título do output</li>
+    <li><code>[[publication-date]]</code> - Data de publicação</li>
+    <li><code>[[abstract]]</code> - Resumo</li>
+    <li><code>[[pure-link]]</code> - Link para o Pure</li>
+    <li><code>[[contributors]]</code> - Autores</li>
+    <li><code>[[keywords]]</code> - Palavras-chave</li>
+    <li><code>[[tag]]</code> - Se o link tiver ativo então a tag é <code><a></code> senão é <code><span></code></li>
+</ul>
+
+<p>Exemplo de uma lista para Outputs: <code>&lt;tr&gt;&lt;td&gt;&lt;[[tag]] href="[[link]]"&gt;[[nome]]&lt;/[[tag]]&gt;&lt;/td&gt;&lt;td&gt;[[ects]]&lt;/td&gt;&lt;/tr&gt;</code></p>
+
+    <input type="hidden" name="id-outputs" value="1">
+
+    <div class="form-group">
+        <label for="exampleFormControlTextarea1">Modelo HTML para os outputs</label>
+        <textarea placeholder="Exemplo: <ul>[[inner]]</ul>" class="form-control" id="exampleFormControlTextarea1" rows="3" name="html_model_inners_outputs"><?php echo $currentHtmlModelInnersOutputs; ?></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="exampleFormControlTextarea2">Modelo HTML para o conteúdo interno dos outputs Por Ano</label>
+        <textarea placeholder='Exemplo: <li><a href="[[pure-link]]">[[title]]</a></li>' class="form-control" id="exampleFormControlTextarea2" rows="3" name="html_model_outers_outputs"><?php echo $currentHtmlModelOutersOutputs; ?></textarea>
+    </div>
+
+    <!-- tabela de cada tipo de output dentro de um ano -->
+    <div class="form-group">
+        <label for="exampleFormControlTextarea3">Modelo HTML para a tabela de cada tipo de output dentro de um ano</label>
+        <textarea placeholder='Exemplo: <tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>' class="form-control" id="exampleFormControlTextarea3" rows="3" name="html_model_table_outputs"><?php echo $currentHtmlModelTableOutputs; ?></textarea>
+    </div>
+
     <button type="submit" class="btn btn-primary">Execute API Call</button>
     <?php echo JHtml::_('form.token'); ?>
 </form>

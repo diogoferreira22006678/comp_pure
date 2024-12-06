@@ -46,13 +46,15 @@ class PureController extends \Joomla\CMS\MVC\Controller\BaseController
 	$input = Factory::getApplication()->input;
 	$institution = $input->getString('institution');
 	$type = $input->getString('type');
-	$start_date = $input->getString('start_date');
-	$end_date = $input->getString('end_date');
+	$outerOutputs = $input->get('html_model_outers_outputs', '', 'raw');
+	$innerOutputs = $input->get('html_model_inners_outputs', '', 'raw');
+	$tableOutputs = $input->get('html_model_table_outputs', '', 'raw');
 	$params = array(
 		'institution' => $institution,
 		'type' => $type,
-		'start_date' => $start_date,
-		'end_date' => $end_date
+		'html_model_outers_outputs' => $outerOutputs,
+		'html_model_inners_outputs' => $innerOutputs,
+		'html_model_table_outputs' => $tableOutputs
 	);
 
     // Verificar o token de segurança
