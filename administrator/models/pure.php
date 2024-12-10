@@ -182,10 +182,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'html_model_outers_outputs' => $outputOuters,
                 'html_model_table_outputs' => $outputTable
             ];
+            $this->ensureGroupFields();
 
             //$this->institutionFilteredTypePersonRoute($params['institution']);
             $this->researchOutputsFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
+
         } catch (Exception $e) {
             print_r('Error in callApiPure: ' . $e->getMessage());
             return false;
@@ -321,61 +323,58 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             // Add the formatted data to the appropriate year and type
             $groupedData[$year][$type][] = $formattedData;
         }
-    
-        // Initialize variable for grouped tables
-        $groupedTables = '';
-    
+
+        $arrayHtmlByYear = [];
         // Process each year/type group into a separate table
         foreach ($groupedData as $year => $types) {
             // Create the year heading
-            $groupedTables .= "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
+            $tableRows = "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
     
             foreach ($types as $type => $outputs) {
-                // Create the type heading
-                $groupedTables .= "<h3>" . htmlspecialchars($type) . "</h3>";
-    
+
                 // Get the user's HTML models
                 $innerTemplate = $this->modelOutputs['html_model_inners_outputs']; // Inner template wraps the list
                 $outerTemplate = $this->modelOutputs['html_model_outers_outputs']; // Outer template formats individual items
                 $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
-    
-                // Render the outer content (individual items)
-                $tableRows = '';
+
                 foreach ($outputs as $output) {
-                    // Replace placeholders in outer HTML model
-                    $tableRow = preg_replace_callback("/\[\[([\w]+)\]\]/", function ($matches) use ($output, $trans) {
-                        $placeholders= [
-                            'title' => $output['title'],
-                            'publication-date' => $output['publication_date'],
-                            'abstract' => $output['abstract'],
-                            'pure-link' => $output['pure_link'],
-                            'contributors' => $output['contributors'],
-                            'keywords' => $output['keywords']
-                        ];
-                        $placeholder = $placeholders[$matches[1]];
-						return isset($placeholders[$placeholder]) ? $placeholders[$placeholder] : $matches[0];
+                    $placeholders = [
+                        'title' => $output['title'],
+                        'publication-date' => $output['publication_date'],
+                        'abstract' => $output['abstract'],
+                        'pure-link' => $output['pure_link'],
+                        'contributors' => $output['contributors'],
+                        'keywords' => $output['keywords'],
+                        
+                    ];
+
+                    $tableRow = preg_replace_callback("/\[\[([\w]+)\]\]/", function ($matches) use ($placeholders) {
+                        $placeholder = $matches[1];
+                        return isset($placeholders[$placeholder]) ? $placeholders[$placeholder] : $matches[0];
                     }, $outerTemplate);
 
                     $tableRows .= "<tr>$tableRow</tr>";
                 }
-    
+
                 // Wrap the outer content using the inner template (list)
                 $renderedInnerContent = str_replace('[[inner]]', $tableRows, $innerTemplate);
-    
-                // Wrap the rendered inner content using the table template (table)
-                $finalOutput = str_replace('[[table]]', $renderedInnerContent, $tableTemplate);
-    
-                // Append the final table content to grouped tables
-                $groupedTables .= $finalOutput;
-            }
-        }
 
-        echo "<pre>";
-        print_r($groupedTables);
-        echo "</pre>";
+                // Add the type and year placeholders to the table template
+                $tableWithTypeAndYear = str_replace(
+                    ['[[type]]', '[[year]]'],
+                    [htmlspecialchars($type), htmlspecialchars($year)],
+                    $tableTemplate
+                );
+
+                // Wrap the rendered inner content using the table template (table)
+                $finalOutput = str_replace('[[table]]', $renderedInnerContent, $tableWithTypeAndYear);
+            }
+
+            $this->createArticleResearchOutput($finalOutput, $this->ensureCategoryExists($this->categoryResearchOutput['researchOutput']), $year);
+        }
     
         // Return the final grouped tables HTML
-        return $groupedTables;
+        return $arrayHtmlByYear;
     }
     
     
@@ -418,7 +417,6 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     private function processPersonsData($data)
     {
         $categoriesIds = $this->getCategoriesIds();
-        $this->ensureGroupFields();
         foreach ($data as $person) {
             $personType = $person['type'];
     
@@ -665,7 +663,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     public function ensureGroupFieldForPerson($groupName = 'Person', $onlyCheck = false)
     {
-        return $this->ensureGroupField($groupName, 'com_content.article', $this->categories, $onlyCheck);
+        return $this->ensureGroupField($groupName, 'com_content.article', $this->categories, $onlyCheck, 'Person');
     }
 
     /**
@@ -677,7 +675,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     private function ensureGroupFieldForInstitution($groupName = 'Institution', $onlyCheck = false)
     {
-        return $this->ensureGroupField($groupName, 'com_content.article', $this->institutionArray, $onlyCheck);
+        return $this->ensureGroupField($groupName, 'com_content.article', $this->institutionArray, $onlyCheck, 'Institution');
     }
 
     /**
@@ -689,7 +687,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     private function ensureGroupFieldForResearchOutput($groupName = 'Research Output', $onlyCheck = false)
     {
-        return $this->ensureGroupField($groupName, 'com_content.article', $this->categoryResearchOutput, $onlyCheck);
+        return $this->ensureGroupField($groupName, 'com_content.article', $this->categoryResearchOutput, $onlyCheck, 'Research Output');
     }
 
     /**
@@ -701,7 +699,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      * @param bool $onlyCheck
      * @return int|array
      */
-    private function ensureGroupField($groupName, $context, $categories, $onlyCheck = false)
+    private function ensureGroupField($groupName, $context, $categories, $onlyCheck = false, $type = 'Person')
     {
         \JLoader::registerNamespace('Joomla\CMS', JPATH_LIBRARIES . '/src');
         $app = Factory::getApplication();
@@ -738,7 +736,18 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $groupId = $model->getState($model->getName() . '.id');
         }
 
-        $this->ensureFieldsExist($groupId, $categories);
+        switch ($type) {
+            case 'Person':
+                $this->ensureFieldsExist($groupId, $categories, $type);
+                break;
+            case 'Institution':
+                $this->ensureFieldsExist($groupId, $categories, $type);
+                break;
+            case 'Research Output':
+                $this->ensureFieldsExist($groupId, $categories, $type);
+                break;
+        }
+
         return $groupId;
     }
 
@@ -748,9 +757,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      * @param int $groupId
      * @param array $categories
      */
-    private function ensureFieldsExist($groupId, $categories)
+    private function ensureFieldsExist($groupId, $categories, $type)
     {
-        $fields = $this->getFieldDefinitions();
+        $fields = $this->getFieldDefinitions($type);
 
         foreach ($fields as $fieldInfo) {
             $this->createOrUpdateField($groupId, $fieldInfo, $categories);
@@ -762,19 +771,38 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      *
      * @return array
      */
-    private function getFieldDefinitions()
+    private function getFieldDefinitions($type)
     {
-        return [
-            ['title' => 'UUID', 'name' => 'uuid'],
-            ['title' => 'Biography', 'name' => 'biography', 'filter' => 'html'],
-            ['title' => 'ORCID ID', 'name' => 'orcid-id'],
-            ['title' => 'Scopus Author ID', 'name' => 'scopus-author-id'],
-            ['title' => 'Ciencia Vitae ID', 'name' => 'ciencia-vitae-id'],
-            ['title' => 'Profile Photo', 'name' => 'profile-photo'],
-            ['title' => 'Link to Pure', 'name' => 'pure-link'],
-            ['title' => 'Email', 'name' => 'email'],
-            ['title' => 'Name Variant', 'name' => 'name-variant']
-        ];
+
+        switch ($type) {
+            case 'Person':
+                return [
+                    ['title' => 'UUID', 'name' => 'uuid'],
+                    ['title' => 'Biography', 'name' => 'biography', 'filter' => 'html'],
+                    ['title' => 'ORCID ID', 'name' => 'orcid-id'],
+                    ['title' => 'Scopus Author ID', 'name' => 'scopus-author-id'],
+                    ['title' => 'Ciencia Vitae ID', 'name' => 'ciencia-vitae-id'],
+                    ['title' => 'Profile Photo', 'name' => 'profile-photo'],
+                    ['title' => 'Link to Pure', 'name' => 'pure-link'],
+                    ['title' => 'Email', 'name' => 'email'],
+                    ['title' => 'Name Variant', 'name' => 'name-variant']
+                ];
+            case 'Institution':
+                return [
+                    ['title' => 'UUID', 'name' => 'uuid'],
+                    ['title' => 'Institution Name', 'name' => 'institution-name'],
+                    ['title' => 'Institution Type', 'name' => 'institution-type'],
+                    ['title' => 'Institution Country', 'name' => 'institution-country'],
+                    ['title' => 'Institution City', 'name' => 'institution-city'],
+                    ['title' => 'Institution Website', 'name' => 'institution-website'],
+                    ['title' => 'Institution Logo', 'name' => 'institution-logo'],
+                    ['title' => 'Institution Description', 'name' => 'institution-description']
+                ];
+            case 'Research Output':
+                return [
+                    ['title' => 'Research Outputs', 'name' => 'research-outputs']
+                ];
+        }
     }
 
     /**
@@ -994,17 +1022,17 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      * @param array $researchOutput
      * @param int $categoryId
      */
-    public function createArticleResearchOutput($researchOutput, $categoryId)
+    public function createArticleResearchOutput($researchOutput, $categoryId, $year)
     {
         $app = Factory::getApplication();
 
         try {
-            $info = $this->generateTitle($researchOutput['title'], $researchOutput['uuid']);
+            $info = $this->generateTitle('Research Outputs', $year);
             $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+            $introtext = $assetId ? $this->deleteArticleById($assetId) : '';
 
             $data = [
-                'title' => $info['title'],
+                'title' => $info['title'] . ' - ' . $year,
                 'alias' => $info['alias'],
                 'introtext' => $introtext,
                 'catid' => $categoryId,
@@ -1023,10 +1051,8 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             }
 
             $articleId = $model->getState('article.id');
-            $researchOutput['article_id'] = $articleId;
-            $this->researchOutputArray[] = $researchOutput;
 
-            $this->updateFieldsForArticle($fields, $researchOutput, $articleId);
+            $this->updateFieldsForArticle($fields, ['research-outputs' => $researchOutput], $articleId);
 
         } catch (Exception $e) {
             print_r('Failed to create research output article: ' . $e->getMessage());

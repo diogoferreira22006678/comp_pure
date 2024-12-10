@@ -56,7 +56,7 @@ class PureController extends \Joomla\CMS\MVC\Controller\BaseController
 		'html_model_inners_outputs' => $innerOutputs,
 		'html_model_table_outputs' => $tableOutputs
 	);
-
+	
     // Verificar o token de segurança
     JSession::checkToken() or jexit(JText::_('JINVALID_TOKEN'));
 

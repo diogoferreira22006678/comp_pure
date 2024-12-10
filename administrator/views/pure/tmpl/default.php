@@ -203,17 +203,17 @@ if (!$tableExists) {
 
     <div class="form-group">
         <label for="exampleFormControlTextarea2">Modelo HTML para o conteúdo interno dos outputs Por Ano</label>
-        <textarea placeholder='Exemplo: <li><a href="[[pure-link]]">[[title]]</a></li>' class="form-control" id="exampleFormControlTextarea2" rows="3" name="html_model_outers_outputs"><?php echo $currentHtmlModelOutersOutputs; ?></textarea>
+        <textarea placeholder='Exemplo: <li><a href="[[pure-link]]">[[title]]</a></li>' class="form-control" id="exampleFormControlTextarea2" rows="3" name="html_model_table_outputs"><?php echo $currentHtmlModelTableOutputs; ?></textarea>
     </div>
 
-    <!-- tabela de cada tipo de output dentro de um ano -->
     <div class="form-group">
         <label for="exampleFormControlTextarea3">Modelo HTML para a tabela de cada tipo de output dentro de um ano</label>
-        <textarea placeholder='Exemplo: <tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>' class="form-control" id="exampleFormControlTextarea3" rows="3" name="html_model_table_outputs"><?php echo $currentHtmlModelTableOutputs; ?></textarea>
+        <textarea placeholder='Exemplo: <tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>' class="form-control" id="exampleFormControlTextarea3" rows="3" name="html_model_outers_outputs"><?php echo $currentHtmlModelOutersOutputs; ?></textarea>
     </div>
 
     <button type="submit" class="btn btn-primary">Execute API Call</button>
     <?php echo JHtml::_('form.token'); ?>
+    
 </form>
 
 
