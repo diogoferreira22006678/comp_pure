@@ -45,6 +45,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     protected $institutionArray = [
         'institution' => ['title' => 'Institution', 'alias' => 'institution', 'description' => 'Institution category']
     ];
+    protected $projectArray = [
+        'project' => ['title' => 'Project', 'alias' => 'project', 'description' => 'Project category']
+    ];
     protected $personArray = [];
     protected $researchOutputArray = [];
     protected $modelOutputs = [];
@@ -183,9 +186,10 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'html_model_table_outputs' => $outputTable
             ];
             $this->ensureGroupFields();
-
-            //$this->institutionFilteredTypePersonRoute($params['institution']);
+            
+                $this->institutionFilteredTypePersonRoute($params['institution']);
             $this->researchOutputsFilteredTypeRoute($params['institution']);
+            $this->projectFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
 
         } catch (Exception $e) {
@@ -256,6 +260,36 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
         $this->processPersonsData($data);
     }
+
+    public function projectFilteredTypeRoute($institution)
+    {
+        $response = $this->institutionDependentsFilteredByPerson($institution);
+        $projects = $response['items'];
+        $data = [];
+    
+        foreach ($projects as $project) {
+            if ($project['systemName'] !== 'Project') continue;
+    
+            $project_response = $this->project($project['uuid']);
+    
+            $data[] = [
+                'acronym' => $project_response['acronym'] ?? 'No Acronym',
+                'reference' => $project_response['identifiers'][0]['id'] ?? 'No Reference',
+                'funding' => $project_response['funding']['total'] ?? 'No Funding Info',
+                'funding_programme' => $project_response['fundingProgramme'] ?? 'No Programme Info',
+                'start_date' => $project_response['period']['startDate'] ?? 'Unknown',
+                'end_date' => $project_response['period']['endDate'] ?? 'Unknown',
+                'status' => $project_response['status'] ?? 'No Status Info',
+                'leading_partner' => $project_response['leadingPartner']['name'] ?? 'No Leading Partner Info',
+                'description' => $project_response['descriptions'][0]['value']['en_GB'] ?? 'No Description Available',
+            ];
+
+            $this->createArticleProject($data, $this->ensureCategoryExists($this->projectArray['project']));
+        }
+    
+        return $data;
+    }
+    
 
     /**
      * Fetches and processes research outputs for an institution.
@@ -436,6 +470,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $this->ensureGroupFieldForPerson();
             $this->ensureGroupFieldForInstitution();
             $this->ensureGroupFieldForResearchOutput();
+            $this->ensureGroupFieldForProject();
         } catch (Exception $e) {
             print_r('Failed to create group field: ' . $e->getMessage());
         }
@@ -495,6 +530,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             }
         }
         return '';
+    }
+
+    private function project($uuid)
+    {
+        $endpoint = 'projects/' . $uuid;
+        return $this->getCustom($endpoint);
     }
 
     /**
@@ -691,6 +732,18 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     }
 
     /**
+     * Ensures that the group field for projects exists, creates if missing.
+     *
+     * @param string $groupName
+     * @param bool $onlyCheck
+     * @return int|array
+     */
+    private function ensureGroupFieldForProject($groupName = 'Project', $onlyCheck = false)
+    {
+        return $this->ensureGroupField($groupName, 'com_content.article', $this->projectArray, $onlyCheck, 'Project');
+    }
+
+    /**
      * Generic method to ensure a group field exists.
      *
      * @param string $groupName
@@ -746,6 +799,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             case 'Research Output':
                 $this->ensureFieldsExist($groupId, $categories, $type);
                 break;
+            case 'Project':
+                $this->ensureFieldsExist($groupId, $categories, $type);
+                break;
         }
 
         return $groupId;
@@ -789,19 +845,31 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 ];
             case 'Institution':
                 return [
-                    ['title' => 'UUID', 'name' => 'uuid'],
-                    ['title' => 'Institution Name', 'name' => 'institution-name'],
-                    ['title' => 'Institution Type', 'name' => 'institution-type'],
-                    ['title' => 'Institution Country', 'name' => 'institution-country'],
-                    ['title' => 'Institution City', 'name' => 'institution-city'],
-                    ['title' => 'Institution Website', 'name' => 'institution-website'],
-                    ['title' => 'Institution Logo', 'name' => 'institution-logo'],
-                    ['title' => 'Institution Description', 'name' => 'institution-description']
                 ];
             case 'Research Output':
                 return [
                     ['title' => 'Research Outputs', 'name' => 'research-outputs']
                 ];
+            case 'Project':
+                return [
+                    ['title' => 'UUID', 'name' => 'uuid'],
+                    ['title' => 'Title', 'name' => 'title'],
+                    ['title' => 'Acronym', 'name' => 'acronym'],
+                    ['title' => 'Project Reference', 'name' => 'project-reference'],
+                    ['title' => 'Funding (Total)', 'name' => 'funding-total'],
+                    ['title' => 'Funding Programme', 'name' => 'funding-programme'],
+                    ['title' => 'Start Date', 'name' => 'start-date'],
+                    ['title' => 'End Date', 'name' => 'end-date'],
+                    ['title' => 'Status', 'name' => 'status'],
+                    ['title' => 'Description', 'name' => 'description', 'filter' => 'html'],
+                    ['title' => 'Leading Partner', 'name' => 'leading-partner'],
+                    ['title' => 'Collaborators', 'name' => 'collaborators'],
+                    ['title' => 'Portal Link', 'name' => 'portal-link'],
+                    ['title' => 'Keywords', 'name' => 'keywords']
+                ];
+            default:
+                return [];
+        
         }
     }
 
@@ -1109,6 +1177,57 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
         } catch (Exception $e) {
             print_r('Failed to create index article: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Creates or updates an article for a project.
+     *
+     * @param array $project
+     * @param int $categoryId
+     */
+
+    public function createArticleProject($project, $categoryId){
+        $app = Factory::getApplication();
+
+        try {
+            $info = $this->generateTitle($project['title'], $project['uuid']);
+            $assetId = $this->getArticleViaAlias($info['alias']);
+            $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+
+            // check if title and alias are valid, if not put a default value with a random number
+            if (empty($info['title']) || empty($info['alias'])) {
+                $info['title'] = 'Project' . rand(1, 1000);
+                $info['alias'] = 'project-' . rand(1, 1000);
+            }
+
+            $data = [
+                'title' => $info['title'],
+                'alias' => $info['alias'],
+                'introtext' => $introtext,
+                'catid' => $categoryId,
+                'state' => 1,
+                'language' => '*',
+                'access' => 1,
+                'created_by' => Factory::getUser()->id,
+            ];
+
+            $groupFieldId = $this->ensureGroupFieldForProject('Project', true);
+            $fields = $this->getFieldsByGroup($groupFieldId);
+
+            $model = $app->bootComponent('com_content')->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true]);
+            if (!$model->save($data)) {
+                throw new Exception('Failed to save article: ' . $model->getError() . ' - with name: ' . $info['title']);
+            }
+
+            $articleId = $model->getState('article.id');
+            $project['article_id'] = $articleId;
+            $this->projectArray[] = $project;
+
+            $this->updateFieldsForArticle($fields, $project, $articleId);
+
+        } catch (Exception $e) {
+            print_r('Failed to create project article: ' . $e->getMessage());
         }
     }
 
