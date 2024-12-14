@@ -187,8 +187,8 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             ];
             $this->ensureGroupFields();
             
-                $this->institutionFilteredTypePersonRoute($params['institution']);
-            $this->researchOutputsFilteredTypeRoute($params['institution']);
+            //$this->institutionFilteredTypePersonRoute($params['institution']);
+            //$this->researchOutputsFilteredTypeRoute($params['institution']);
             $this->projectFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
 
@@ -266,24 +266,26 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $response = $this->institutionDependentsFilteredByPerson($institution);
         $projects = $response['items'];
         $data = [];
-    
         foreach ($projects as $project) {
+
             if ($project['systemName'] !== 'Project') continue;
     
             $project_response = $this->project($project['uuid']);
-    
+            print_r($project_response);
+            print_r('------------------- PROJECT -------------------' + '\n\n');
             $data[] = [
+                'title-project' => $project_response['title']['value'] ?? 'No Title Available',
                 'acronym' => $project_response['acronym'] ?? 'No Acronym',
                 'reference' => $project_response['identifiers'][0]['id'] ?? 'No Reference',
                 'funding' => $project_response['funding']['total'] ?? 'No Funding Info',
-                'funding_programme' => $project_response['fundingProgramme'] ?? 'No Programme Info',
-                'start_date' => $project_response['period']['startDate'] ?? 'Unknown',
-                'end_date' => $project_response['period']['endDate'] ?? 'Unknown',
+                'funding-programme' => $project_response['fundingProgramme'] ?? 'No Programme Info',
+                'start-date' => $project_response['period']['startDate'] ?? 'Unknown',
+                'end-date' => $project_response['period']['endDate'] ?? 'Unknown',
                 'status' => $project_response['status'] ?? 'No Status Info',
-                'leading_partner' => $project_response['leadingPartner']['name'] ?? 'No Leading Partner Info',
+                'leading-partner' => $project_response['leadingPartner']['name'] ?? 'No Leading Partner Info',
                 'description' => $project_response['descriptions'][0]['value']['en_GB'] ?? 'No Description Available',
             ];
-
+        
             $this->createArticleProject($data, $this->ensureCategoryExists($this->projectArray['project']));
         }
     
@@ -361,6 +363,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $arrayHtmlByYear = [];
         // Process each year/type group into a separate table
         foreach ($groupedData as $year => $types) {
+
+            // if year is not set then dont create the table
+            if($year == 'Sem Ano' || $year == 'No Year') {
+                continue;
+            }
+
             // Create the year heading
             $tableRows = "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
     
@@ -372,11 +380,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
 
                 foreach ($outputs as $output) {
+                    
                     $placeholders = [
                         'title' => $output['title'],
-                        'publication-date' => $output['publication_date'],
+                        'publication-date' => $output['publication-date'],
                         'abstract' => $output['abstract'],
-                        'pure-link' => $output['pure_link'],
+                        'pureLink' => $output['pure-link'],
                         'contributors' => $output['contributors'],
                         'keywords' => $output['keywords'],
                         
@@ -853,7 +862,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             case 'Project':
                 return [
                     ['title' => 'UUID', 'name' => 'uuid'],
-                    ['title' => 'Title', 'name' => 'title'],
+                    ['title' => 'Title', 'name' => 'title-project'],
                     ['title' => 'Acronym', 'name' => 'acronym'],
                     ['title' => 'Project Reference', 'name' => 'project-reference'],
                     ['title' => 'Funding (Total)', 'name' => 'funding-total'],
@@ -1197,8 +1206,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             // check if title and alias are valid, if not put a default value with a random number
             if (empty($info['title']) || empty($info['alias'])) {
-                $info['title'] = 'Project' . rand(1, 1000);
-                $info['alias'] = 'project-' . rand(1, 1000);
+                return;
             }
 
             $data = [

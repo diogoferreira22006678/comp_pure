@@ -129,21 +129,34 @@ if (!$tableExists) {
     $db->setQuery($innerOutputs);
     $currentHtmlModelInnersOutputs = $db->loadResult();
     if (empty($currentHtmlModelInnersOutputs)) {
-        $currentHtmlModelInnersOutputs = '<li><a href="[[pure-link]]">[[title]]</a></li>';
+        $currentHtmlModelInnersOutputs = '<div class="year-section">
+    [[inner]]
+</div>
+';
     }
 
     $OuterOutputs = "SELECT html_model_outers FROM $tableName WHERE id = 1";
     $db->setQuery($OuterOutputs);
     $currentHtmlModelOutersOutputs = $db->loadResult();
     if (empty($currentHtmlModelOutersOutputs)) {
-        $currentHtmlModelOutersOutputs = '<ul>[[inner]]</ul>';
+        $currentHtmlModelOutersOutputs = '<table class="research-table">
+    <thead>
+        <tr>
+            <th>[[type]]</th>
+        </tr>
+    </thead>
+    <tbody>
+        [[table]]
+    </tbody>
+</table>
+';
     }
 
     $tableOutputs = "SELECT html_model_table FROM $tableName WHERE id = 1";
     $db->setQuery($tableOutputs);
     $currentHtmlModelTableOutputs = $db->loadResult();
     if (empty($currentHtmlModelTableOutputs)) {
-        $currentHtmlModelTableOutputs = '<tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>';
+        $currentHtmlModelTableOutputs = '<tr><td><a href="[[link]]">[[title]]</a></td></tr>';
     }
 }
 
@@ -186,7 +199,7 @@ if (!$tableExists) {
     <li><code>[[title]]</code> - Título do output</li>
     <li><code>[[publication-date]]</code> - Data de publicação</li>
     <li><code>[[abstract]]</code> - Resumo</li>
-    <li><code>[[pure-link]]</code> - Link para o Pure</li>
+    <li><code>[[link]]</code> - Link para o Pure</li>
     <li><code>[[contributors]]</code> - Autores</li>
     <li><code>[[keywords]]</code> - Palavras-chave</li>
     <li><code>[[tag]]</code> - Se o link tiver ativo então a tag é <code><a></code> senão é <code><span></code></li>
