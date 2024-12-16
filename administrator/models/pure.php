@@ -188,8 +188,8 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $this->ensureGroupFields();
             
             //$this->institutionFilteredTypePersonRoute($params['institution']);
-            //$this->researchOutputsFilteredTypeRoute($params['institution']);
-            $this->projectFilteredTypeRoute($params['institution']);
+            $this->researchOutputsFilteredTypeRoute($params['institution']);
+            //$this->projectFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
 
         } catch (Exception $e) {
@@ -271,10 +271,60 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             if ($project['systemName'] !== 'Project') continue;
     
             $project_response = $this->project($project['uuid']);
-            print_r($project_response);
-            print_r('------------------- PROJECT -------------------' + '\n\n');
-            $data[] = [
-                'title-project' => $project_response['title']['value'] ?? 'No Title Available',
+            
+            $participants = '';
+foreach ($project_response['participants'] as $participant) {
+
+    // Debug: Print participant details
+    print_r($participant);
+
+    // first and last name to camel case
+    $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
+    $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
+
+    // Debug: Print names after formatting
+    echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
+    echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
+
+    if (isset($participant['person']['uuid'])) {
+        $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
+
+        // Debug: Print portal URL
+        echo "Portal URL: " . $portalUrl . "\n";
+
+        $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
+    } else {
+        $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
+    }
+}
+$participants = rtrim($participants, ', ');
+
+// Debug: Print the final participants string
+echo "Participants: " . $participants . "\n";
+
+// Process Collaborators
+$collaborators = '';
+foreach ($project_response['collaborators'] as $collaborator) {
+
+    // Debug: Print collaborator details
+    print_r($collaborator);
+
+    if (isset($collaborator['externalOrganization']['uuid'])) {
+        $name = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
+        $collaborators .= $name . ', ';
+    }
+}
+$collaborators = rtrim($collaborators, ', ');
+
+// Debug: Print the final collaborators string
+echo "Collaborators: " . $collaborators . "\n";
+
+
+            
+            $data = [
+                'uuid-project' => $project['uuid'],
+                'portal-link' => $project_response['portalUrl'] ?? '',
+                'title-project' => $project_response['title']['en_GB'] ?? 'No Title Available',
                 'acronym' => $project_response['acronym'] ?? 'No Acronym',
                 'reference' => $project_response['identifiers'][0]['id'] ?? 'No Reference',
                 'funding' => $project_response['funding']['total'] ?? 'No Funding Info',
@@ -282,14 +332,18 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'start-date' => $project_response['period']['startDate'] ?? 'Unknown',
                 'end-date' => $project_response['period']['endDate'] ?? 'Unknown',
                 'status' => $project_response['status'] ?? 'No Status Info',
-                'leading-partner' => $project_response['leadingPartner']['name'] ?? 'No Leading Partner Info',
-                'description' => $project_response['descriptions'][0]['value']['en_GB'] ?? 'No Description Available',
+                'leading-partner' => isset($project_response['participants'][0]['name'])
+                    ? $project_response['participants'][0]['name']['firstName'] . ' ' . $project_response['participants'][0]['name']['lastName']
+                    : 'No Leading Partner Info',
+                'description' => isset($project_response['descriptions'][0]['value']['en_GB'])
+                    ? $project_response['descriptions'][0]['value']['en_GB']
+                    : 'No Description Available',
+                'participants' => $participants,
+                'collaborators' => $collaborators
             ];
         
             $this->createArticleProject($data, $this->ensureCategoryExists($this->projectArray['project']));
         }
-    
-        return $data;
     }
     
 
@@ -344,6 +398,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $research_output_uuid = $research_output['uuid'];
             $research_output_response = $this->researchOutput($research_output_uuid);
             $formattedData = $this->formatResearchOutputData($research_output_response);
+            
             // Extract year and type
             $year = $formattedData['publication-date'] ?? $trans['no_year'];
             $type = $formattedData['type'] ?? $trans['no_type'];
@@ -380,13 +435,16 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
 
                 foreach ($outputs as $output) {
+
+                    // transform title into APA format
+                    
                     
                     $placeholders = [
                         'title' => $output['title'],
                         'publication-date' => $output['publication-date'],
                         'abstract' => $output['abstract'],
                         'pureLink' => $output['pure-link'],
-                        'contributors' => $output['contributors'],
+                        'contributors' => $output['contributors-research-output'],
                         'keywords' => $output['keywords'],
                         
                     ];
@@ -432,13 +490,33 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     private function formatResearchOutputData($research_output_response)
     {
-        $title = trim($research_output_response['title']['value'] ?? 'No Title Available');
+        //$title = $this->formatTitleAPA($research_output_response['title']['value'] ?? 'No Title Available');
         $publication_date = $research_output_response['publicationStatuses'][0]['publicationDate']['year'] ?? 'Unknown';
         $abstract = $research_output_response['abstract']['pt_PT'] ?? 'No abstract available';
         $pure_link = $research_output_response['portalUrl'] ?? '';
-        $contributors = $this->getContributors($research_output_response['contributors']);
         $keywords = $this->getKeywords($research_output_response['keywordGroups']);
         $type = $research_output_response['type']['term']['en_GB'] ?? 'No Type';
+        $contributors = $this->formatContributorsAPA($research_output_response['contributors']);
+
+        $html = file_get_contents($pure_link);
+
+        if ($html !== false) {
+            $doc = new DOMDocument();
+            @$doc->loadHTML($html);
+
+            // Assuming the APA citation is inside a div with class 'citation'
+            $xpath = new DOMXPath($doc);
+            $citation = $xpath->query('//div[@id="cite-apa"]');
+
+            if ($citation->length > 0) {
+                $title = $citation->item(0)->nodeValue;
+            } else {
+                echo "APA citation not found.";
+            }
+        } else {
+            echo "Failed to fetch the portal link.";
+    }
+
 
         return [
             'uuid' => $research_output_response['uuid'],
@@ -448,9 +526,72 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             'pure-link' => $pure_link,
             'contributors' => $contributors,
             'keywords' => $keywords,
-            'type' => $type
+            'type' => $type,
+            'contributors-research-output' => $contributors
         ];
     }
+
+    // Function to format titles in APA style
+    private function formatTitleAPA($title)
+    {
+        // Convert the title to lowercase and capitalize only the first word and proper nouns
+        $words = explode(' ', strtolower($title));
+        foreach ($words as $key => $word) {
+            if ($key === 0 || $this->isProperNoun($word)) {
+                $words[$key] = ucfirst($word);
+            }
+        }
+        return implode(' ', $words);
+    }
+
+    // Function to determine if a word is a proper noun
+    private function isProperNoun($word)
+    {
+        // Add logic to check for proper nouns (e.g., predefined list, capitalized in source data)
+        // For simplicity, assuming proper nouns are words already capitalized
+        return ctype_upper($word[0]);
+    }
+
+    // Function to format contributors in APA style
+    private function formatContributorsAPA($participants)
+    {
+        $formattedContributors = [];
+
+
+        foreach ($participants as $participant) {
+
+            print_r($participant);
+
+            if (isset($participant['uuid'])) {
+                $uuid = $participant['uuid']; // Internal person UUID
+            } elseif (isset($contributor['externalPerson']['uuid'])) {
+                $uuid = $contributor['externalPerson']['uuid']; // External person UUID
+            }
+
+            // Ensure firstName and lastName exist
+            $firstName = $participant['name']['firstName'] ?? '';
+            $lastName = $participant['name']['lastName'] ?? '';
+    
+            // Capitalize first letter of each name
+            $firstName = ucwords(strtolower($firstName));
+            $lastName = ucwords(strtolower($lastName));
+    
+            // Extract the initial from the first name
+            $initial = isset($firstName[0]) ? strtoupper($firstName[0]) . '.' : '';
+    
+            // if uuid then add the portal link
+            if (isset($uuid)) {
+                $portalUrl = $this->person($uuid)['portalUrl'];
+                $formattedContributors[] = '<a href="' . $portalUrl . '">' . $lastName . ', ' . $initial . '</a>';
+            } else {
+                $formattedContributors[] =  $lastName . ', ' . $initial;
+            }
+        }
+    
+        return implode(', ', $formattedContributors);
+    }
+    
+
 
     /**
      * Process and create articles for persons data.
@@ -547,6 +688,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         return $this->getCustom($endpoint);
     }
 
+    public function externalOrganization($uuid)
+    {
+        $endpoint = 'external-organizations/' . $uuid;
+        return $this->getCustom($endpoint);
+    }
+
     /**
      * Retrieves name variant or constructs it from first and last names.
      *
@@ -593,25 +740,6 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         }
 
         return [$scopus_author_id, $ciencia_vitae_id];
-    }
-
-    /**
-     * Retrieves contributors list from contributors array.
-     *
-     * @param array $contributorsArray
-     * @return array
-     */
-    private function getContributors($contributorsArray)
-    {
-        $contributors = [];
-        foreach ($contributorsArray as $contributor) {
-            $firstName = $contributor['name']['firstName'] ?? '';
-            $lastName = $contributor['name']['lastName'] ?? '';
-            if ($firstName || $lastName) {
-                $contributors[] = $firstName . ' ' . $lastName;
-            }
-        }
-        return $contributors;
     }
 
     /**
@@ -857,11 +985,12 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 ];
             case 'Research Output':
                 return [
-                    ['title' => 'Research Outputs', 'name' => 'research-outputs']
+                    ['title' => 'Research Outputs', 'name' => 'research-outputs'],
+                    ['title' => 'Contributors', 'name' => 'contributors-research-output'],
                 ];
             case 'Project':
                 return [
-                    ['title' => 'UUID', 'name' => 'uuid'],
+                    ['title' => 'UUID', 'name' => 'uuid-project'],
                     ['title' => 'Title', 'name' => 'title-project'],
                     ['title' => 'Acronym', 'name' => 'acronym'],
                     ['title' => 'Project Reference', 'name' => 'project-reference'],
@@ -872,9 +1001,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                     ['title' => 'Status', 'name' => 'status'],
                     ['title' => 'Description', 'name' => 'description', 'filter' => 'html'],
                     ['title' => 'Leading Partner', 'name' => 'leading-partner'],
-                    ['title' => 'Collaborators', 'name' => 'collaborators'],
                     ['title' => 'Portal Link', 'name' => 'portal-link'],
-                    ['title' => 'Keywords', 'name' => 'keywords']
+                    ['title' => 'Collaborators', 'name' => 'collaborators'],
+                    ['title' => 'Participants', 'name' => 'participants']
                 ];
             default:
                 return [];
@@ -1200,12 +1329,13 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $app = Factory::getApplication();
 
         try {
-            $info = $this->generateTitle($project['title'], $project['uuid']);
+            $info = $this->generateTitle($project['title-project'], $project['uuid-project']);
             $assetId = $this->getArticleViaAlias($info['alias']);
             $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
 
             // check if title and alias are valid, if not put a default value with a random number
             if (empty($info['title']) || empty($info['alias'])) {
+                print_r('Invalid title or alias for project: ' . $project['title-project'] . ' - ' . $project['uuid-project']);
                 return;
             }
 

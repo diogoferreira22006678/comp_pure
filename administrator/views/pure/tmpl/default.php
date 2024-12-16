@@ -199,7 +199,7 @@ if (!$tableExists) {
     <li><code>[[title]]</code> - Título do output</li>
     <li><code>[[publication-date]]</code> - Data de publicação</li>
     <li><code>[[abstract]]</code> - Resumo</li>
-    <li><code>[[link]]</code> - Link para o Pure</li>
+    <li><code>[[pureLink]]</code> - Link para o Pure</li>
     <li><code>[[contributors]]</code> - Autores</li>
     <li><code>[[keywords]]</code> - Palavras-chave</li>
     <li><code>[[tag]]</code> - Se o link tiver ativo então a tag é <code><a></code> senão é <code><span></code></li>
