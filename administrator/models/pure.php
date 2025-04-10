@@ -479,8 +479,49 @@ echo "Collaborators: " . $collaborators . "\n";
     }
     
     
+    private function generateApaCitation(array $data): string
+    {
+        $contributors = $this->formatContributorsAPA($data['contributors'] ?? []);
+        $year = $data['publicationStatuses'][0]['publicationDate']['year'] ?? 'n.d.';
+        $title = $data['title']['value'] ?? 'No title';
     
+        // Journal info
+        $journal = $data['journalAssociation']['title']['title'] ?? null;
+        $volume = $data['volume'] ?? null;
+        $issue = $data['journalNumber'] ?? null;
+        $pages = $data['pages'] ?? null;
     
+        // Get DOI from correct electronicVersion
+        $doi = null;
+        if (isset($data['electronicVersions'])) {
+            foreach ($data['electronicVersions'] as $ev) {
+                if ($ev['typeDiscriminator'] === 'DoiElectronicVersion' && isset($ev['doi'])) {
+                    $doi = $ev['doi'];
+                    break;
+                }
+            }
+        }
+    
+        $link = $doi ? "https://doi.org/{$doi}" : ($data['portalUrl'] ?? '');
+    
+        // Build journal info
+        $journal_info = '';
+        if ($journal) {
+            $journal_info = "<i>{$journal}</i>";
+            if ($volume) {
+                $journal_info .= ", <i>{$volume}</i>";
+            }
+            if ($issue) {
+                $journal_info .= "({$issue})";
+            }
+            if ($pages) {
+                $journal_info .= ", {$pages}";
+            }
+        }
+    
+        return "{$contributors} ({$year}). <i>{$title}</i>. {$journal_info}. {$link}";
+    }
+        
 
     /**
      * Formats research output data for article creation.
@@ -497,30 +538,31 @@ echo "Collaborators: " . $collaborators . "\n";
         $keywords = $this->getKeywords($research_output_response['keywordGroups']);
         $type = $research_output_response['type']['term']['en_GB'] ?? 'No Type';
         $contributors = $this->formatContributorsAPA($research_output_response['contributors']);
+        $apa_citation = $this->generateApaCitation($research_output_response);
 
         $html = file_get_contents($pure_link);
 
-        if ($html !== false) {
-            $doc = new DOMDocument();
-            @$doc->loadHTML($html);
+        // if ($html !== false) {
+        //     $doc = new DOMDocument();
+        //     @$doc->loadHTML($html);
 
-            // Assuming the APA citation is inside a div with class 'citation'
-            $xpath = new DOMXPath($doc);
-            $citation = $xpath->query('//div[@id="cite-apa"]');
+        //     // Assuming the APA citation is inside a div with class 'citation'
+        //     $xpath = new DOMXPath($doc);
+        //     $citation = $xpath->query('//div[@id="cite-apa"]');
 
-            if ($citation->length > 0) {
-                $title = $citation->item(0)->nodeValue;
-            } else {
-                echo "APA citation not found.";
-            }
-        } else {
-            echo "Failed to fetch the portal link.";
-    }
+        //     if ($citation->length > 0) {
+        //         $title = $citation->item(0)->nodeValue;
+        //     } else {
+        //         echo "APA citation not found.";
+        //     }
+        // } else {
+        //     echo "Failed to fetch the portal link.";
+        // }
 
 
         return [
             'uuid' => $research_output_response['uuid'],
-            'title' => $title,
+            'title' => $apa_citation,
             'publication-date' => $publication_date,
             'abstract' => $abstract,
             'pure-link' => $pure_link,
