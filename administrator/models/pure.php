@@ -187,9 +187,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             ];
             $this->ensureGroupFields();
             
-            //$this->institutionFilteredTypePersonRoute($params['institution']);
-            $this->researchOutputsFilteredTypeRoute($params['institution']);
-            //$this->projectFilteredTypeRoute($params['institution']);
+            // $this->institutionFilteredTypePersonRoute($params['institution']);
+            // $this->researchOutputsFilteredTypeRoute($params['institution']);
+            $this->projectFilteredTypeRoute($params['institution']);
             // $this->createIndexPage($params);
 
         } catch (Exception $e) {
@@ -273,61 +273,62 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $project_response = $this->project($project['uuid']);
             
             $participants = '';
-foreach ($project_response['participants'] as $participant) {
 
-    // Debug: Print participant details
-    print_r($participant);
+            foreach ($project_response['participants'] as $participant) {
 
-    // first and last name to camel case
-    $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
-    $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
+                // Debug: Print participant details
+                print_r($participant);
 
-    // Debug: Print names after formatting
-    echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
-    echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
+                // first and last name to camel case
+                $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
+                $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
 
-    if (isset($participant['person']['uuid'])) {
-        $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
+                // Debug: Print names after formatting
+                echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
+                echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
 
-        // Debug: Print portal URL
-        echo "Portal URL: " . $portalUrl . "\n";
+                if (isset($participant['person']['uuid'])) {
+                    $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
 
-        $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
-    } else {
-        $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
-    }
-}
-$participants = rtrim($participants, ', ');
+                    // Debug: Print portal URL
+                    echo "Portal URL: " . $portalUrl . "\n";
 
-// Debug: Print the final participants string
-echo "Participants: " . $participants . "\n";
+                    $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
+                } else {
+                    $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
+                }
+            }
+            $participants = rtrim($participants, ', ');
 
-// Process Collaborators
-$collaborators = '';
-foreach ($project_response['collaborators'] as $collaborator) {
+            // Debug: Print the final participants string
+            echo "Participants: " . $participants . "\n";
 
-    // Debug: Print collaborator details
-    print_r($collaborator);
+            // Process Collaborators
+            $collaborators = '';
+            foreach ($project_response['collaborators'] as $collaborator) {
 
-    if (isset($collaborator['externalOrganization']['uuid'])) {
-        $name = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
-        $collaborators .= $name . ', ';
-    }
-}
-$collaborators = rtrim($collaborators, ', ');
+                // Debug: Print collaborator details
+                print_r($collaborator);
 
-// Debug: Print the final collaborators string
-echo "Collaborators: " . $collaborators . "\n";
+                if (isset($collaborator['externalOrganization']['uuid'])) {
+                    $name = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
+                    $collaborators .= $name . ', ';
+                }
+            }
+            $collaborators = rtrim($collaborators, ', ');
 
+            // Debug: Print the final collaborators string
+            echo "Collaborators: " . $collaborators . "\n";
 
+            echo "Project Reference: " . $project_response['identifiers'][0]['id'] . "\n";
             
             $data = [
                 'uuid-project' => $project['uuid'],
                 'portal-link' => $project_response['portalUrl'] ?? '',
                 'title-project' => $project_response['title']['en_GB'] ?? 'No Title Available',
                 'acronym' => $project_response['acronym'] ?? 'No Acronym',
-                'reference' => $project_response['identifiers'][0]['id'] ?? 'No Reference',
-                'funding' => $project_response['funding']['total'] ?? 'No Funding Info',
+                'project-reference' => $project_response['identifiers'][0]['id'] ?? 'No Reference',
+                'funding-total' => $project_response['funding']['total'] ?? 'No Funding Info',
                 'funding-programme' => $project_response['fundingProgramme'] ?? 'No Programme Info',
                 'start-date' => $project_response['period']['startDate'] ?? 'Unknown',
                 'end-date' => $project_response['period']['endDate'] ?? 'Unknown',
