@@ -41,32 +41,43 @@ class PureController extends \Joomla\CMS\MVC\Controller\BaseController
 	}
 
 	public function executeApiCall()
-{
+	{
 
-	$input = Factory::getApplication()->input;
-	$institution = $input->getString('institution');
-	$type = $input->getString('type');
-	$outerOutputs = $input->get('html_model_outers_outputs', '', 'raw');
-	$innerOutputs = $input->get('html_model_inners_outputs', '', 'raw');
-	$tableOutputs = $input->get('html_model_table_outputs', '', 'raw');
-	$params = array(
-		'institution' => $institution,
-		'type' => $type,
-		'html_model_outers_outputs' => $outerOutputs,
-		'html_model_inners_outputs' => $innerOutputs,
-		'html_model_table_outputs' => $tableOutputs
-	);
+		$input = Factory::getApplication()->input;
+		$institution = $input->getString('institution');
+		$type = $input->getString('type');
+		$outerOutputs = $input->get('html_model_outers_outputs', '', 'raw');
+		$innerOutputs = $input->get('html_model_inners_outputs', '', 'raw');
+		$tableOutputs = $input->get('html_model_table_outputs', '', 'raw');
+		$params = array(
+			'institution' => $input->getString('institution'),
+			'type' => $input->getString('type'),
 	
-    // Verificar o token de segurança
-    JSession::checkToken() or jexit(JText::_('JINVALID_TOKEN'));
+			// Outputs
+			'html_model_outers_outputs' => $input->get('html_model_outers_outputs', '', 'raw'),
+			'html_model_inners_outputs' => $input->get('html_model_inners_outputs', '', 'raw'),
+			'html_model_table_outputs' => $input->get('html_model_table_outputs', '', 'raw'),
+	
+			// Participantes
+			'html_model_inners_participants' => $input->get('html_model_inners_participants', '', 'raw'),
+			'html_model_outers_participants' => $input->get('html_model_outers_participants', '', 'raw'),
+			'html_model_inners_participants_cord' => $input->get('html_model_inners_participants_cord', '', 'raw'),
+	
+			// Colaboradores
+			'html_model_inners_collaborators' => $input->get('html_model_inners_collaborators', '', 'raw'),
+			'html_model_outers_collaborators' => $input->get('html_model_outers_collaborators', '', 'raw'),
+		);
+		
+		// Verificar o token de segurança
+		JSession::checkToken() or jexit(JText::_('JINVALID_TOKEN'));
 
-    // Obter o modelo
-    $model = $this->getModel('pure');
-	if ($model) {
-		$model->callApiPure($params);
-	} else {
-		log("Model not found");
+		// Obter o modelo
+		$model = $this->getModel('pure');
+		if ($model) {
+			$model->callApiPure($params);
+		} else {
+			log("Model not found");
+		}
 	}
-}
 
 }

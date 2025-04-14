@@ -174,23 +174,40 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     public function callApiPure($params)
     {
         try {
-
+            // Outputs
             $outputInners = $params['html_model_inners_outputs'];
             $outputOuters = $params['html_model_outers_outputs'];
             $outputTable = $params['html_model_table_outputs'];
             $this->updateHtmlModelsOutputs($outputOuters, $outputInners, 1, $outputTable);
 
+            // Participantes
+            $participantInners = $params['html_model_inners_participants'];
+            $participantOuters = $params['html_model_outers_participants'];
+            $participantCord = $params['html_model_inners_participants_cord'];
+            $this->updateHtmlModelsOutputs($participantOuters, $participantCord, 2, $participantInners);
+
+            // Colaboradores
+            $collabInners = $params['html_model_inners_collaborators'];
+            $collabOuters = $params['html_model_outers_collaborators'];
+            $this->updateHtmlModelsOutputs($collabOuters, $collabInners, 3, null);
+
+            // Guardar os modelos para referência, se necessário
             $this->modelOutputs = [
                 'html_model_inners_outputs' => $outputInners,
                 'html_model_outers_outputs' => $outputOuters,
-                'html_model_table_outputs' => $outputTable
+                'html_model_table_outputs' => $outputTable,
+                'html_model_inners_participants' => $participantInners,
+                'html_model_outers_participants' => $participantOuters,
+                'html_model_inners_participants_cord' => $participantCord,
+                'html_model_inners_collaborators' => $collabInners,
+                'html_model_outers_collaborators' => $collabOuters
             ];
+
             $this->ensureGroupFields();
             
             // $this->institutionFilteredTypePersonRoute($params['institution']);
             // $this->researchOutputsFilteredTypeRoute($params['institution']);
             $this->projectFilteredTypeRoute($params['institution']);
-            // $this->createIndexPage($params);
 
         } catch (Exception $e) {
             print_r('Error in callApiPure: ' . $e->getMessage());
@@ -198,17 +215,6 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         }
         return true;
     }
-
-    // /**
-    //  * Creates index page for the institution.
-    //  *
-    //  * @param array $params
-    //  */
-    // public function createIndexPage($params)
-    // {
-    //     $institutionDetails = $this->getInstitutionDetails($params['institution']);
-    //     $this->createArticleIndex($institutionDetails, $this->ensureCategoryExists($this->institutionArray['institution']));
-    // }
 
     /**
      * Fetches persons of specified types from an institution.
@@ -272,50 +278,59 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     
             $project_response = $this->project($project['uuid']);
             
-            $participants = '';
+            // $participants = '';
 
-            foreach ($project_response['participants'] as $participant) {
+            // foreach ($project_response['participants'] as $participant) {
 
-                // Debug: Print participant details
-                print_r($participant);
+            //     // Debug: Print participant details
+            //     print_r($participant);
 
-                // first and last name to camel case
-                $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
-                $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
+            //     // first and last name to camel case
+            //     $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
+            //     $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
 
-                // Debug: Print names after formatting
-                echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
-                echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
+            //     // Debug: Print names after formatting
+            //     echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
+            //     echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
 
-                if (isset($participant['person']['uuid'])) {
-                    $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
+            //     if (isset($participant['person']['uuid'])) {
+            //         $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
 
-                    // Debug: Print portal URL
-                    echo "Portal URL: " . $portalUrl . "\n";
+            //         // Debug: Print portal URL
+            //         echo "Portal URL: " . $portalUrl . "\n";
 
-                    $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
-                } else {
-                    $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
-                }
-            }
-            $participants = rtrim($participants, ', ');
+            //         $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
+            //     } else {
+            //         $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
+            //     }
+            // }
+            // $participants = rtrim($participants, ', ');
+
+            $participants = json_encode($project_response['participants']);
+            $participants = $this->processHtmlParticipants($project_response['participants']);
 
             // Debug: Print the final participants string
             echo "Participants: " . $participants . "\n";
 
-            // Process Collaborators
-            $collaborators = '';
+            $leading_partner = '';
             foreach ($project_response['collaborators'] as $collaborator) {
 
                 // Debug: Print collaborator details
                 print_r($collaborator);
 
                 if (isset($collaborator['externalOrganization']['uuid'])) {
-                    $name = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
-                    $collaborators .= $name . ', ';
+                    // check if leadCollaborator is set to true
+                    if ($collaborator['leadCollaborator'] == true) {
+                        $leading_partner = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
+                        // Debug: Print leading partner name
+                        echo "Leading Partner: " . $leading_partner . "\n";
+                        break;
+                    }
                 }
             }
-            $collaborators = rtrim($collaborators, ', ');
+
+            // add the raw collaborators json 
+            $collaborators = json_encode($project_response['collaborators']);
 
             // Debug: Print the final collaborators string
             echo "Collaborators: " . $collaborators . "\n";
@@ -333,9 +348,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'start-date' => $project_response['period']['startDate'] ?? 'Unknown',
                 'end-date' => $project_response['period']['endDate'] ?? 'Unknown',
                 'status' => $project_response['status'] ?? 'No Status Info',
-                'leading-partner' => isset($project_response['participants'][0]['name'])
-                    ? $project_response['participants'][0]['name']['firstName'] . ' ' . $project_response['participants'][0]['name']['lastName']
-                    : 'No Leading Partner Info',
+                'leading-partner' => $leading_partner,
                 'description' => isset($project_response['descriptions'][0]['value']['en_GB'])
                     ? $project_response['descriptions'][0]['value']['en_GB']
                     : 'No Description Available',
@@ -478,7 +491,62 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         // Return the final grouped tables HTML
         return $arrayHtmlByYear;
     }
+
+
+    public function processHtmlParticipants($participants,)
+    {
+        // Modelos HTML personalizados
+        $innerCoord = $this->modelOutputs['html_model_inners_participants_cord'];       // <ul> para coordenação
+        $innerGeneral = $this->modelOutputs['html_model_inners_participants'];          // <ul> para outros
+        $itemTemplate = $this->modelOutputs['html_model_outers_participants'];          // <li> com tags
     
+        $coordinators = '';
+        $others = '';
+    
+        foreach ($participants as $participant) {
+
+           // Obter dados de nome e papel
+            $firstName = ucfirst($participant['name']['firstName'] ?? '');
+            $lastName = ucfirst($participant['name']['lastName'] ?? '');
+            $fullName = trim($firstName . ' ' . $lastName);
+            $role = $participant['role']['term']['en_GB'] ?? 'Unknown';
+
+            // Link para o Pure, se existir
+            $pureLink = '#';
+            if (isset($participant['person']['uuid'])) {
+                $personData = $this->person($participant['person']['uuid']);
+                $pureLink = $personData['portalUrl'] ?? '#';
+            }
+
+            // Mapear para placeholders
+            $placeholders = [
+                'nome' => $fullName,
+                'Papel' => $role,
+                'pureLink' => $pureLink
+            ];
+    
+            // Substituir placeholders no template
+            $renderedItem = preg_replace_callback("/\[\[([\w]+)\]\]/", function ($matches) use ($placeholders) {
+                $key = $matches[1];
+                return isset($placeholders[$key]) ? $placeholders[$key] : $matches[0];
+            }, $itemTemplate);
+
+            // Verificar se é PI ou CoPI
+            $roleSlug = strtolower($role);
+            if ($roleSlug === 'pi' || $roleSlug === 'copi' || $roleSlug === 'project manager') {
+                $coordinators .= $renderedItem;
+            } else {
+                $others .= $renderedItem;
+            }
+        }
+
+        // Renderizar blocos finais
+        $htmlCoord = !empty($coordinators) ? str_replace('[[inner]]', $coordinators, $innerCoord) : '';
+        $htmlOthers = !empty($others) ? str_replace('[[inner]]', $others, $innerGeneral) : '';
+
+        return $htmlCoord . $htmlOthers;
+    }
+            
     
     private function generateApaCitation(array $data): string
     {
@@ -1227,7 +1295,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         try {
             $info = $this->generateTitle($person['name-variant'], $person['uuid']);
             $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+            $introtext = $assetId ? $this->deleteArticleById($assetId) : '';
 
             // check if title and alias are valid, if not put a default value with a random number
             if (empty($info['title']) || empty($info['alias'])) {
@@ -1309,59 +1377,6 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     }
 
     /**
-     * Creates or updates an index article for an institution.
-     *
-     * @param array $institutionDetails
-     * @param int $categoryId
-     */
-    public function createArticleIndex($institutionDetails, $categoryId)
-    {
-        $app = Factory::getApplication();
-
-        try {
-
-            $academics = $this->generateListHtml($this->personArray, 'name_variant', 'article_id');
-            $research_outputs = $this->generateListHtmlResearchOutputs($this->researchOutputArray, 'title', 'article_id');
-
-            $info = $this->generateTitle($institutionDetails['name']['pt_PT'], $institutionDetails['uuid']);
-            $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : $academics . '<br><br>' . $research_outputs;
-
-            $data = [
-                'title' => $info['title'],
-                'alias' => $info['alias'],
-                'introtext' => $introtext,
-                'catid' => $categoryId,
-                'state' => 1,
-                'language' => '*',
-                'access' => 1,
-                'created_by' => Factory::getUser()->id,
-                'featured' => 1
-            ];
-
-            $groupFieldId = $this->ensureGroupFieldForInstitution('Institution', true);
-            $fields = $this->getFieldsByGroup($groupFieldId);
-            
-
-            $model = $app->bootComponent('com_content')->getMVCFactory()->createModel('Article', 'Administrator', ['ignore_request' => true]);
-            if (!$model->save($data)) {
-                throw new Exception('Failed to save article: ' . $model->getError() . ' - with name: ' . $info['title']);
-            }
-
-            $articleId = $model->getState('article.id');
-            $this->updateFieldsForArticle($fields, [
-                'uuid' => $institutionDetails['uuid'],
-                'name-institution' => $institutionDetails['name']['pt_PT'],
-                'academics' => $academics,
-                'research-outputs-institution' => $research_outputs
-            ], $articleId);
-
-        } catch (Exception $e) {
-            print_r('Failed to create index article: ' . $e->getMessage());
-        }
-    }
-
-    /**
      * Creates or updates an article for a project.
      *
      * @param array $project
@@ -1374,7 +1389,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         try {
             $info = $this->generateTitle($project['title-project'], $project['uuid-project']);
             $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : 'Default introtext';
+            $introtext = $assetId ? $this->deleteArticleById($assetId) : '';
 
             // check if title and alias are valid, if not put a default value with a random number
             if (empty($info['title']) || empty($info['alias'])) {

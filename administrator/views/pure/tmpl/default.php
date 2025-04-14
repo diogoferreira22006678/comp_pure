@@ -129,9 +129,9 @@ if (!$tableExists) {
     $db->setQuery($innerOutputs);
     $currentHtmlModelInnersOutputs = $db->loadResult();
     if (empty($currentHtmlModelInnersOutputs)) {
-        $currentHtmlModelInnersOutputs = '<div class="year-section">
-    [[inner]]
-</div>
+        $currentHtmlModelInnersOutputs =    '<div class="year-section">
+                                                [[inner]]
+                                            </div>
 ';
     }
 
@@ -140,16 +140,16 @@ if (!$tableExists) {
     $currentHtmlModelOutersOutputs = $db->loadResult();
     if (empty($currentHtmlModelOutersOutputs)) {
         $currentHtmlModelOutersOutputs = '<table class="research-table">
-    <thead>
-        <tr>
-            <th>[[type]]</th>
-        </tr>
-    </thead>
-    <tbody>
-        [[table]]
-    </tbody>
-</table>
-';
+        <thead>
+            <tr>
+                <th>[[type]]</th>
+            </tr>
+        </thead>
+        <tbody>
+            [[table]]
+        </tbody>
+        </table>
+        ';
     }
 
     $tableOutputs = "SELECT html_model_table FROM $tableName WHERE id = 1";
@@ -158,6 +158,44 @@ if (!$tableExists) {
     if (empty($currentHtmlModelTableOutputs)) {
         $currentHtmlModelTableOutputs = '<tr><td><a href="[[link]]">[[title]]</a></td></tr>';
     }
+
+
+    $innerParticipants = "SELECT html_model_inners FROM $tableName WHERE id = 2";
+    $db->setQuery($innerParticipants);
+    $currentHtmlModelInnersParticipants = $db->loadResult();
+    if (empty($currentHtmlModelInnersParticipants)) {
+        $currentHtmlModelInnersParticipants = '<ul class="research-table">[[inner]]</ul>';
+    }
+
+    $outerParticipants = "SELECT html_model_outers FROM $tableName WHERE id = 2";
+    $db->setQuery($outerParticipants);
+    $currentHtmlModelOutersParticipants = $db->loadResult();
+    if (empty($currentHtmlModelOutersParticipants)) {
+        $currentHtmlModelOutersParticipants = '<ul class="research-table">[[inner]]</ul>';
+    
+    }
+
+    $tableParticipants = "SELECT html_model_table FROM $tableName WHERE id = 2";
+    $db->setQuery($tableParticipants);
+    $currentHtmlModelTableParticipants = $db->loadResult();
+    if (empty($currentHtmlModelTableParticipants)) {
+        $currentHtmlModelTableParticipants = '<li> <a href="[[link]]">[[nome]]</a> - [[Papel]]</li>';
+    }
+
+    $innerCollaborators = "SELECT html_model_inners FROM $tableName WHERE id = 3";
+    $db->setQuery($innerCollaborators);
+    $currentHtmlModelInnersCollaborators = $db->loadResult();
+    if (empty($currentHtmlModelInnersCollaborators)) {
+        $currentHtmlModelInnersCollaborators = '<ul class="research-table">[[inner]]</ul>';
+    }
+
+    $outerCollaborators = "SELECT html_model_outers FROM $tableName WHERE id = 3";
+    $db->setQuery($outerCollaborators);
+    $currentHtmlModelOutersCollaborators = $db->loadResult();
+    if (empty($currentHtmlModelOutersCollaborators)) {
+        $currentHtmlModelOutersCollaborators = '<li>[[nome]]</li>';
+    }
+
 }
 
 ?>
@@ -205,7 +243,7 @@ if (!$tableExists) {
     <li><code>[[tag]]</code> - Se o link tiver ativo então a tag é <code><a></code> senão é <code><span></code></li>
 </ul>
 
-<p>Exemplo de uma lista para Outputs: <code>&lt;tr&gt;&lt;td&gt;&lt;[[tag]] href="[[link]]"&gt;[[nome]]&lt;/[[tag]]&gt;&lt;/td&gt;&lt;td&gt;[[ects]]&lt;/td&gt;&lt;/tr&gt;</code></p>
+<p>Exemplo de uma lista para Outputs: <code>&lt;tr&gt;&lt;td&gt;&lt;[[tag]] href="[[pureLink]]"&gt;[[title]]&lt;/td&gt;&lt;/tr&gt;</code></p>
 
     <input type="hidden" name="id-outputs" value="1">
 
@@ -222,6 +260,51 @@ if (!$tableExists) {
     <div class="form-group">
         <label for="exampleFormControlTextarea3">Modelo HTML para a tabela de cada tipo de output dentro de um ano</label>
         <textarea placeholder='Exemplo: <tr><td>[[title]]</td><td>[[publication-date]]</td><td>[[abstract]]</td><td>[[contributors]]</td><td>[[keywords]]</td></tr>' class="form-control" id="exampleFormControlTextarea3" rows="3" name="html_model_outers_outputs"><?php echo $currentHtmlModelOutersOutputs; ?></textarea>
+    </div>
+
+    <h2 class="h4">Participantes</h2>
+    <ul>
+        <h3 class="h5">Variáveis disponíveis para os participantes:</h3>
+        <li><code>[[nome]]</code> - Nome do participante</li>
+        <li><code>[[Papel]]</code> - Papel no projeto</li>
+        <li><code>[[pureLink]]</code> - Link para o Pure do participante</li>
+    </ul>
+    <p>Exemplo de uma lista para Participantes: <code>&lt;li&gt;&lt;a href="[[pureLink]]"&gt;[[nome]]&lt;/a&gt; - [[Papel]]&lt;/li&gt;</code></p>
+
+    <input type="hidden" name="id-participants" value="2">
+    <div class="form-group">
+        <label for="exampleFormControlTextarea4">Modelo HTML para os participantes</label>
+        <textarea placeholder='Exemplo: <ul>[[inner]]</ul>' class="form-control" id="exampleFormControlTextarea4" rows="3" name="html_model_inners_participants"><?php echo $currentHtmlModelTableParticipants; ?></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="exampleFormControlTextarea6">Modelo HTML para os participantes que cordenam</label>
+        <textarea placeholder='Exemplo: <tr><td>[[nome]]</td><td>[[Papel]]</td></tr>' class="form-control" id="exampleFormControlTextarea5" rows="3" name="html_model_inners_participants_cord"><?php echo $currentHtmlModelInnersParticipants; ?></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="exampleFormControlTextarea5">Modelo HTML para o conteúdo interno dos participantes</label>
+        <textarea placeholder='Exemplo: <li><a href="[[pure-link]]">[[nome]]</a> - [[Papel]]</li>' class="form-control" id="exampleFormControlTextarea6" rows="3" name="html_model_outers_participants"><?php echo $currentHtmlModelOutersParticipants; ?></textarea>
+    </div>
+
+    <h2 class="h4">Colaboradores</h2>
+
+    <ul>
+        <h3 class="h5">Variáveis disponíveis para os colaboradores:</h3>
+        <li><code>[[nome]]</code> - Nome do colaborador</li>
+    </ul>
+
+    <p>Exemplo de uma lista para Colaboradores: <code>&lt;li&gt;[[nome]]&lt;/li&gt;</code></p>
+
+    <input type="hidden" name="id-collaborators" value="3">
+    <div class="form-group">
+        <label for="exampleFormControlTextarea7">Modelo HTML para os colaboradores</label>
+        <textarea placeholder='Exemplo: <ul>[[inner]]</ul>' class="form-control" id="exampleFormControlTextarea7" rows="3" name="html_model_inners_collaborators"><?php echo $currentHtmlModelInnersCollaborators; ?></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="exampleFormControlTextarea8">Modelo HTML interno para os colaboradores</label>
+        <textarea placeholder='Exemplo: <tr><td>[[nome]]</td></tr>' class="form-control" id="exampleFormControlTextarea8" rows="3" name="html_model_outers_collaborators"><?php echo $currentHtmlModelOutersCollaborators; ?></textarea>
     </div>
 
     <button type="submit" class="btn btn-primary">Execute API Call</button>
