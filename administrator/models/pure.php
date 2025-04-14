@@ -516,7 +516,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 $name = $organization['name']['en_GB'] ?? 'Unknown';
                 if ($collaborator['leadCollaborator'] == true) {
                     $leading_partner = $name;
-                }
+                }                
     
                 // Substituir [[nome]] no template
                 $renderedItem = str_replace('[[nome]]', $name, $itemTemplate);
@@ -525,15 +525,6 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             }
         }
 
-        if (isset($collaborator['externalOrganization']['uuid'])) {
-            // check if leadCollaborator is set to true
-            if ($collaborator['leadCollaborator'] == true) {
-                $leading_partner = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
-                // Debug: Print leading partner name
-                echo "Leading Partner: " . $leading_partner . "\n";
-                break;
-            }
-        }
 
         $collaborators = str_replace('[[inner]]', $collabList, $innerTemplate);
 
