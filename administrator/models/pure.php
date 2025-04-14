@@ -277,60 +277,11 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             if ($project['systemName'] !== 'Project') continue;
     
             $project_response = $this->project($project['uuid']);
-            
-            // $participants = '';
 
-            // foreach ($project_response['participants'] as $participant) {
-
-            //     // Debug: Print participant details
-            //     print_r($participant);
-
-            //     // first and last name to camel case
-            //     $participant['name']['firstName'] = ucfirst($participant['name']['firstName']);
-            //     $participant['name']['lastName'] = ucfirst($participant['name']['lastName']);
-
-            //     // Debug: Print names after formatting
-            //     echo "Formatted First Name: " . $participant['name']['firstName'] . "\n";
-            //     echo "Formatted Last Name: " . $participant['name']['lastName'] . "\n";
-
-            //     if (isset($participant['person']['uuid'])) {
-            //         $portalUrl = $this->person($participant['person']['uuid'])['portalUrl'];
-
-            //         // Debug: Print portal URL
-            //         echo "Portal URL: " . $portalUrl . "\n";
-
-            //         $participants .= '<a href="' . $portalUrl . '">' . $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '</a>(' . $participant['role']['term']['en_GB'] . '), ';
-            //     } else {
-            //         $participants .= $participant['name']['firstName'] . ' ' . $participant['name']['lastName'] . '(' . $participant['role']['term']['en_GB'] . '), ';
-            //     }
-            // }
-            // $participants = rtrim($participants, ', ');
-
-            $participants = json_encode($project_response['participants']);
             $participants = $this->processHtmlParticipants($project_response['participants']);
-
-            // Debug: Print the final participants string
-            echo "Participants: " . $participants . "\n";
-
-            $leading_partner = '';
-            foreach ($project_response['collaborators'] as $collaborator) {
-
-                // Debug: Print collaborator details
-                print_r($collaborator);
-
-                if (isset($collaborator['externalOrganization']['uuid'])) {
-                    // check if leadCollaborator is set to true
-                    if ($collaborator['leadCollaborator'] == true) {
-                        $leading_partner = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
-                        // Debug: Print leading partner name
-                        echo "Leading Partner: " . $leading_partner . "\n";
-                        break;
-                    }
-                }
-            }
-
-            // add the raw collaborators json 
-            $collaborators = json_encode($project_response['collaborators']);
+            $collaborators = $this->processHtmlCollaborators($project_response['collaborators']);
+            $leading_partner = $collaborators['leading_partner'];
+            $collaborators = $collaborators['collaborators'];
 
             // Debug: Print the final collaborators string
             echo "Collaborators: " . $collaborators . "\n";
@@ -493,7 +444,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     }
 
 
-    public function processHtmlParticipants($participants,)
+    public function processHtmlParticipants($participants)
     {
         // Modelos HTML personalizados
         $innerCoord = $this->modelOutputs['html_model_inners_participants_cord'];       // <ul> para coordenação
@@ -546,6 +497,55 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
         return $htmlCoord . $htmlOthers;
     }
+
+    public function processHtmlCollaborators($collaborators)
+    {
+        // Modelos HTML personalizados
+        $innerTemplate = $this->modelOutputs['html_model_inners_collaborators'];   // Ex: <ul>[[inner]]</ul>
+        $itemTemplate = $this->modelOutputs['html_model_outers_collaborators'];    // Ex: <li>[[nome]]</li>
+    
+        $collabList = '';
+        $leading_partner = '';
+    
+        foreach ($collaborators as $collaborator) {
+            if (isset($collaborator['externalOrganization']['uuid'])) {
+                $uuid = $collaborator['externalOrganization']['uuid'];
+    
+                // Buscar nome da organização externa
+                $organization = $this->externalOrganization($uuid);
+                $name = $organization['name']['en_GB'] ?? 'Unknown';
+                if ($collaborator['leadCollaborator'] == true) {
+                    $leading_partner = $name;
+                }
+    
+                // Substituir [[nome]] no template
+                $renderedItem = str_replace('[[nome]]', $name, $itemTemplate);
+    
+                $collabList .= $renderedItem;
+            }
+        }
+
+        if (isset($collaborator['externalOrganization']['uuid'])) {
+            // check if leadCollaborator is set to true
+            if ($collaborator['leadCollaborator'] == true) {
+                $leading_partner = $this->externalOrganization($collaborator['externalOrganization']['uuid'])['name']['en_GB'];
+                // Debug: Print leading partner name
+                echo "Leading Partner: " . $leading_partner . "\n";
+                break;
+            }
+        }
+
+        $collaborators = str_replace('[[inner]]', $collabList, $innerTemplate);
+
+        $result = [
+            'collaborators' => $collaborators,
+            'leading_partner' => $leading_partner
+        ];
+    
+        // Envolver com o modelo <ul>[[inner]]</ul>
+        return $result;
+    }
+    
             
     
     private function generateApaCitation(array $data): string
