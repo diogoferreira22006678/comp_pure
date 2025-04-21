@@ -30,6 +30,12 @@ JLoader::register('JTableCategory', JPATH_PLATFORM . '/joomla/database/table/cat
 
 class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
+	public function __construct()
+	{
+		parent::__construct();
+		$this->addValueConfig();
+	}
+
     protected $base_url = 'https://research.ulusofona.pt/ws/api/';
     protected $categories = [
         'academic' => ['title' => 'Academic', 'alias' => 'academic', 'description' => 'Academic category'],
@@ -51,6 +57,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
     protected $personArray = [];
     protected $researchOutputArray = [];
     protected $modelOutputs = [];
+    protected $institution = null;
 
     /**
      * Method to auto-populate the model state.
@@ -118,6 +125,17 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         $items = parent::getItems();
         return $items;
     }
+
+    function addValueConfig()
+	{
+		// Load Joomla configuration
+		// components/com_yourcomponent/models/yourmodel.php
+
+		// Include your component's configuration file that is on folder site in the component's root folder
+		$config = require JPATH_SITE . '/components/com_pure/config.php';
+
+		$this->institution = $config['institution'];
+	}
 
     // function to save output models
     public function updateHtmlModelsOutputs($html_model_outers, $html_model_inners, $id, $html_model_table = '')
@@ -205,9 +223,9 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
 
             $this->ensureGroupFields();
             
-            // $this->institutionFilteredTypePersonRoute($params['institution']);
-            // $this->researchOutputsFilteredTypeRoute($params['institution']);
-            $this->projectFilteredTypeRoute($params['institution']);
+            $this->institutionFilteredTypePersonRoute($this->institution);
+            $this->researchOutputsFilteredTypeRoute($this->institution);
+            $this->projectFilteredTypeRoute($this->institution);
 
         } catch (Exception $e) {
             print_r('Error in callApiPure: ' . $e->getMessage());
@@ -1305,6 +1323,14 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'created_by' => Factory::getUser()->id,
             ];
 
+            if ($assetId) {
+                // Optionally get existing article data to preserve fields like introtext
+                $data['id'] = $assetId;
+            } else {
+                // New article, initialize introtext
+                $data['introtext'] = '';
+            }
+
             $groupFieldId = $this->ensureGroupFieldForPerson('Person', true);
             $fields = $this->getFieldsByGroup($groupFieldId);
 
@@ -1380,7 +1406,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
         try {
             $info = $this->generateTitle($project['title-project'], $project['uuid-project']);
             $assetId = $this->getArticleViaAlias($info['alias']);
-            $introtext = $assetId ? $this->deleteArticleById($assetId) : '';
+            // $introtext = $assetId ? $this->deleteArticleById($assetId) : '';
 
             // check if title and alias are valid, if not put a default value with a random number
             if (empty($info['title']) || empty($info['alias'])) {
@@ -1391,13 +1417,20 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             $data = [
                 'title' => $info['title'],
                 'alias' => $info['alias'],
-                'introtext' => $introtext,
                 'catid' => $categoryId,
                 'state' => 1,
                 'language' => '*',
                 'access' => 1,
                 'created_by' => Factory::getUser()->id,
             ];
+
+            if ($assetId) {
+                // Load existing article introtext (optional: or retrieve full article for update)
+                $data['id'] = $assetId;
+            } else {
+                // Creating new article
+                $data['introtext'] = '';
+            }
 
             $groupFieldId = $this->ensureGroupFieldForProject('Project', true);
             $fields = $this->getFieldsByGroup($groupFieldId);

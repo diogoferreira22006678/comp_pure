@@ -23,68 +23,14 @@ function addValueConfig() {
 
     $base_url = $config['base_url'];
     $base_api = $config['base_api'];
+    $institution = $config['institution'];
+    $institution_name = $config['institution_name'];
 
-    return array($base_url, $base_api);
+    return array($base_url, $base_api, $institution, $institution_name);
 }
 
-list($base_url, $base_api) = addValueConfig();
+list($base_url, $base_api, $institution, $institution_name) = addValueConfig();
 
-
-function post($endpoint, $data, $base_url) {
-    $url = $base_url . $endpoint;
-
-    // Create an HTTP object
-    $http = JHttpFactory::getHttp();
-
-    // Set the headers
-    $headers = array('Content-Type' => 'application/json');
-
-    // Make the POST request
-    $response = $http->post($url, json_encode($data), $headers);
-
-    // Check for errors or process the response as needed
-    if ($response->code >= 200 && $response->code < 300) {
-        return json_decode($response->body, true);
-    } else {
-        // Handle error
-        return null;
-    }
-}
-
-function getCustom($endpoint, $queryParams = array(), $base_url) {
-
-    $queryString = http_build_query($queryParams);
-
-    $url = $base_url . $endpoint . '?' . $queryString;
-
-    // Create an HTTP object
-    $http = JHttpFactory::getHttp();
-    $api_key = '47e5bd25-8649-4b60-b8b7-ac0e1381b300'; 
-
-    // Set the headers
-    $headers = array(
-                    'Content-Type' => 'application/json',
-                    'Api-Key' => $api_key
-                    );
-
-    // Make the POST request
-    $response = $http->get($url, $headers);
-
-    // Check for errors or process the response as needed
-    if ($response->code >= 200 && $response->code < 300) {
-        return json_decode($response->body, true);
-    } else {
-        // Show the error
-        return 'Gave this error: ' . $response->body . ' and this code: ' . $response->code . ' and this url: ' . $url . ' and this headers: ' . $headers;
-    }
-}
-
-function institutuions($base_url) {
-    return getCustom('organizations', array(), $base_url);
-}
-
-$response = institutuions($base_api);
-$institutions = $response['items'];
 
 // Get a database connection
 $db = Factory::getDbo();
@@ -201,20 +147,13 @@ if (!$tableExists) {
 ?>
 
 <h1 class="h3">PRL (Pure Research Lusófona) </h1>
-
-<!-- subtitle -->
-<h2 class="h4">Institution Filtered By Type</h2>
-<form action="<?php echo JRoute::_('index.php?option=com_pure&task=executeApiCall'); ?>" method="post" name="adminForm" id="adminForm">
-    <input type="hidden" name="call" value="institutionFilteredTypePersonRoute" />
-    <div class="form-group">
-        <label for="institution">Institution</label>
-        <select class="form-control" id="institution" name="institution">
-            <?php foreach ($institutions as $institution) : ?>
-                <option value="<?php echo $institution['uuid']; ?>"><?php echo $institution['name']['pt_PT']; ?></option>
-            <?php endforeach; ?>
-        </select>
-    </div>
+<div class="alert alert-info" role="alert">
+    <h4 class="alert-heading">Configuração</h4>
+    <hr>
+    <p class="mb-0" name="institutionName">Nome da instituição: <?php echo $institution_name; ?> <span style="opacity: 0.5;">(<?php echo $institution; ?>)</span></p>
+</div>
 <hr>
+
 
 <h1 class="h3">Modelo HTML</h1>
 
@@ -244,6 +183,7 @@ if (!$tableExists) {
 </ul>
 
 <p>Exemplo de uma lista para Outputs: <code>&lt;tr&gt;&lt;td&gt;&lt;[[tag]] href="[[pureLink]]"&gt;[[title]]&lt;/td&gt;&lt;/tr&gt;</code></p>
+<form action="<?php echo JRoute::_('index.php?option=com_pure&task=executeApiCall'); ?>" method="post" name="adminForm" id="adminForm">
 
     <input type="hidden" name="id-outputs" value="1">
 
