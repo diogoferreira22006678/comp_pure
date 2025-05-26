@@ -337,11 +337,11 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
      */
     public function researchOutputsFilteredTypeRoute($institution)
     {
-        // Fetch dependents by institution
+        // 1. Obter os resultados da instituição
         $response = $this->institutionDependentsFilteredByPerson($institution);
         $research_outputs = $response['items'];
-    
-        // Translation dictionary
+
+        // 2. Dicionário de tradução
         $translations = [
             'pt-PT' => [
                 'no_year' => 'Sem Ano',
@@ -366,62 +366,72 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                 'research_outputs' => 'Research Outputs'
             ]
         ];
-    
-        // Retrieve translations based on the selected language
-        $lang = 'en-GB'; // Set default language, can be dynamic
-        $trans = $translations[$lang] ?? $translations['en-GB']; // Default to English if language not found
-    
-        // Group research outputs by year and type
+
+        $lang = 'en-GB'; // Pode ser dinâmico
+        $trans = $translations[$lang] ?? $translations['en-GB'];
+
+        // 3. Agrupar por ano e tipo
         $groupedData = [];
         foreach ($research_outputs as $research_output) {
-            if ($research_output['systemName'] !== 'ResearchOutput') {
-                continue;
-            }
-    
-            $research_output_uuid = $research_output['uuid'];
-            $research_output_response = $this->researchOutput($research_output_uuid);
-            $formattedData = $this->formatResearchOutputData($research_output_response);
-            
-            // Extract year and type
-            $year = $formattedData['publication-date'] ?? $trans['no_year'];
-            $type = $formattedData['type'] ?? $trans['no_type'];
-    
-            // Initialize the structure if not set
-            if (!isset($groupedData[$year])) {
-                $groupedData[$year] = [];
-            }
-            if (!isset($groupedData[$year][$type])) {
-                $groupedData[$year][$type] = [];
-            }
-    
-            // Add the formatted data to the appropriate year and type
-            $groupedData[$year][$type][] = $formattedData;
+            if ($research_output['systemName'] !== 'ResearchOutput') continue;
+
+            $uuid = $research_output['uuid'];
+            $data = $this->formatResearchOutputData($this->researchOutput($uuid));
+
+            $year = $data['publication-date'] ?? $trans['no_year'];
+            $type = $data['type'] ?? $trans['no_type'];
+
+            $groupedData[$year][$type][] = $data;
         }
 
         $arrayHtmlByYear = [];
-        // Process each year/type group into a separate table
+        $allTypes = [];
+
+        // 4. Preparar filtro (coletar tipos únicos)
         foreach ($groupedData as $year => $types) {
-
-            // if year is not set then dont create the table
-            if($year == 'Sem Ano' || $year == 'No Year') {
-                continue;
+            foreach (array_keys($types) as $type) {
+                $allTypes[$type] = true;
             }
+        }
 
-            // Create the year heading
-            $tableRows = "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
-    
+        // 5. Gerar HTML do filtro
+        $typeFilterHtml = '<form id="typeFilterForm" style="margin-bottom:20px;">';
+        $typeFilterHtml .= '<label for="typeFilter">Filtrar por tipo:</label>';
+        $typeFilterHtml .= '<select id="typeFilter">';
+        $typeFilterHtml .= '<option value="all">Todos</option>';
+        foreach (array_keys($allTypes) as $type) {
+            $value = htmlspecialchars(strtolower($type));
+            $label = htmlspecialchars($type);
+            $typeFilterHtml .= "<option value=\"$value\">$label</option>";
+        }
+        $typeFilterHtml .= '</select></form>';
+
+        // 6. Adicionar JS para filtragem dinâmica
+        $typeFilterHtml .= <<<JS
+    <script>
+    document.getElementById('typeFilter').addEventListener('change', function () {
+        const selected = this.value;
+        const rows = document.querySelectorAll('tr[class^="research-output-type-"]');
+        rows.forEach(row => {
+            row.style.display = (selected === 'all' || row.classList.contains('research-output-type-' + selected)) ? '' : 'none';
+        });
+    });
+    </script>
+    JS;
+
+        // 7. Gerar HTML por ano e tipo
+        foreach ($groupedData as $year => $types) {
+            if ($year === 'Sem Ano' || $year === 'No Year') continue;
+
+            $tableRows = $typeFilterHtml;
+            $tableRows .= "<h2>{$trans['research_outputs']} - " . htmlspecialchars($year) . "</h2>";
+
             foreach ($types as $type => $outputs) {
-
-                // Get the user's HTML models
-                $innerTemplate = $this->modelOutputs['html_model_inners_outputs']; // Inner template wraps the list
-                $outerTemplate = $this->modelOutputs['html_model_outers_outputs']; // Outer template formats individual items
-                $tableTemplate = $this->modelOutputs['html_model_table_outputs']; // Table template for grouping
+                $innerTemplate = $this->modelOutputs['html_model_inners_outputs'];
+                $outerTemplate = $this->modelOutputs['html_model_outers_outputs'];
+                $tableTemplate = $this->modelOutputs['html_model_table_outputs'];
 
                 foreach ($outputs as $output) {
-
-                    // transform title into APA format
-                    
-                    
                     $placeholders = [
                         'title' => $output['title'],
                         'publication-date' => $output['publication-date'],
@@ -429,37 +439,26 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
                         'pureLink' => $output['pure-link'],
                         'contributors' => $output['contributors-research-output'],
                         'keywords' => $output['keywords'],
-                        
                     ];
 
                     $tableRow = preg_replace_callback("/\[\[([\w]+)\]\]/", function ($matches) use ($placeholders) {
-                        $placeholder = $matches[1];
-                        return isset($placeholders[$placeholder]) ? $placeholders[$placeholder] : $matches[0];
+                        return $placeholders[$matches[1]] ?? $matches[0];
                     }, $outerTemplate);
 
-                    $tableRows .= "<tr>$tableRow</tr>";
+                    $tableRows .= "<tr class='research-output-type-" . htmlspecialchars(strtolower($type)) . "'>$tableRow</tr>";
                 }
 
-                // Wrap the outer content using the inner template (list)
-                $renderedInnerContent = str_replace('[[inner]]', $tableRows, $innerTemplate);
+                $renderedInner = str_replace('[[inner]]', $tableRows, $innerTemplate);
+                $tableWithTypeAndYear = str_replace(['[[type]]', '[[year]]'], [htmlspecialchars($type), htmlspecialchars($year)], $tableTemplate);
+                $finalOutput = str_replace('[[table]]', $renderedInner, $tableWithTypeAndYear);
 
-                // Add the type and year placeholders to the table template
-                $tableWithTypeAndYear = str_replace(
-                    ['[[type]]', '[[year]]'],
-                    [htmlspecialchars($type), htmlspecialchars($year)],
-                    $tableTemplate
-                );
-
-                // Wrap the rendered inner content using the table template (table)
-                $finalOutput = str_replace('[[table]]', $renderedInnerContent, $tableWithTypeAndYear);
+                $this->createArticleResearchOutput($finalOutput, $this->ensureCategoryExists($this->categoryResearchOutput['researchOutput']), $year);
             }
-
-            $this->createArticleResearchOutput($finalOutput, $this->ensureCategoryExists($this->categoryResearchOutput['researchOutput']), $year);
         }
-    
-        // Return the final grouped tables HTML
+
         return $arrayHtmlByYear;
     }
+
 
 
     public function processHtmlParticipants($participants)
@@ -1106,7 +1105,7 @@ class PureModelPure extends \Joomla\CMS\MVC\Model\ListModel {
             case 'Research Output':
                 return [
                     ['title' => 'Research Outputs', 'name' => 'research-outputs'],
-                    ['title' => 'Contributors', 'name' => 'contributors-research-output'],
+                    ['title' => 'Research Output Object', 'name' => 'research-output-object'],
                 ];
             case 'Project':
                 return [
